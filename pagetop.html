@@ -1,0 +1,45 @@
+<html>
+<head>
+	<title>piPlayer</title>
+	<meta charset="UTF-8">
+	<style>
+		a,p { font-size: 60px; font-family: sans-serif; margin : 20px; } 
+		a.playing { font: emphasise; background-color: rgb(100,255,100); }
+		div#scrolling { overflow: auto;  background-color: #cc9; }
+	    html, body { overflow: hidden; height: 100% }
+        body { margin:0; padding:0; }
+		div#top { background-color: #bdd; border-bottom: solid #bdd }
+		p.title { color: green; font-style: italic; text-shadow: 2px 2px #333 }
+	</style>
+	<script>
+	var scrolldiv;
+	var topdiv;
+	function resizeScroller()
+	{
+	   scrolldiv.style.height = window.innerHeight - topdiv.offsetHeight;
+	}
+	function placeScroller()
+	{
+	   topdiv = document.getElementById('top');
+	   scrolldiv = document.getElementById('scrolling');
+	   scrolldiv.style.top = topdiv.offsetHeight + 1;
+	   resizeScroller();
+	}
+	window.onload = placeScroller;
+	window.onresize = resizeScroller;
+	</script>
+</head>
+<body>
+<div id='top'>
+<a href='./'>Refresh</a>
+<a href='./pause'>Pause</a>
+<a href='./stop'>Stop</a>
+<!--
+<a href='./prevch'>&lt;&lt;</a>
+<a href='./back10m'>&lt;10min</a>
+<a href='./back30s'>&lt;30s</a>
+<a href='./fwd30s'>30s&gt;</a>
+<a href='./fwd10m'>10min&gt;</a>
+<a href = './nextch'>&gt;&gt;</a>
+-->
+<br/>
