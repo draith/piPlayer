@@ -7,6 +7,11 @@ var musicpath = musicroot;
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
+var player = child_process.fork('./player');
+
+player.on('message', function(message) {
+	console.log('Received from child: ' + message);
+});
 
 // Populates trackNames as map from filename to track title,
 // from id3v2 output.
@@ -52,86 +57,88 @@ function parseID3(id3Output) {
 	}
 }
 
-function start(route, handle) {
-	function displayPage(response) {
-		response.writeHead(200, {"Content-Type": "text/html"});
-		response.write(fs.readFileSync('pagetop.html'));
-		// Display directory links...
-		response.write("<p>");
-		var linkPath = musicroot;
-		var diffPath = musicpath.substr(linkPath.length+1).split('/');
-		while (linkPath != musicpath)
+function displayPage(response) {
+	response.writeHead(200, {"Content-Type": "text/html"});
+	response.write(fs.readFileSync('pagetop.html'));
+	// Display directory links...
+	response.write("<p>");
+	var linkPath = musicroot;
+	var diffPath = musicpath.substr(linkPath.length+1).split('/');
+	while (linkPath != musicpath)
+	{
+		response.write(libLink(linkPath));
+		linkPath = linkPath + '/' + diffPath.shift();
+		if (linkPath != musicpath)
 		{
-			response.write(libLink(linkPath));
-			linkPath = linkPath + '/' + diffPath.shift();
-			if (linkPath != musicpath)
-			{
-				response.write('>');
-			}
+			response.write('>');
 		}
-		// Write title of current directory
-		var dirName = musicpath.split('/').pop();
-		response.write('</p><p class="title">' + dirName + '</p>');
-		// Display contents of current directory in scrolling div.
-		response.write('</div>\n<div id=scrolling>');
-		var files = fs.readdirSync(musicpath);
-		for (i = 0; i < files.length; i++)
-		{
-			response.write('<p>' + libLink(musicpath + '/' + files[i]) + '</p>');
-		}
-		response.write('</div>');
-		response.write(fs.readFileSync('pagebot.html'));
-		response.end();
-		
-	} // displayPage
+	}
+	// Write title of current directory
+	var dirName = musicpath.split('/').pop();
+	response.write('</p><p class="title">' + dirName + '</p>');
+	// Display contents of current directory in scrolling div.
+	response.write('</div>\n<div id=scrolling>');
+	var files = fs.readdirSync(musicpath);
+	for (i = 0; i < files.length; i++)
+	{
+		response.write('<p>' + libLink(musicpath + '/' + files[i]) + '</p>');
+	}
+	response.write('</div>');
+	response.write(fs.readFileSync('pagebot.html'));
+	response.end();
+	
+} // displayPage
 
-  // Display title and hyperlink(s) for one item in current directory.
-  function libLink(path) {
-	  var stat = fs.statSync(path);
-	  if (stat.isDirectory())
-	  {
-		  // Display directory link(s)
-		  var pathName = path.split('/').pop();
-		  // Display directory name in hyperlink to 'cd' to that directory.
-		  var result = '<a href="./cd?dir=' + encodeURIComponent(path) + '">' + pathName + '</a>';
-		  // Check for any mp3 files in the directory...
-		  var files = fs.readdirSync(path);
- 		  for (j = 0; j < files.length; j++)
-		  {
-			  // If any, include a 'playdir' link, to play all of them.
-			if (/\.mp3$/.test(files[j])) {
-				result += '<a href="./playdir?dir=' + encodeURIComponent(path) + '"> (Play)</a>';
-				break;
-			} 
-		  }
-		  return result;
-	  }
-	  else if (/\.mp3$/.test(path))
-	  {
-		  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-		  return '<p><a href="./play?file=' + encodeURIComponent(path) + '">' + 
-					(trackNames[path] || path) + '</a>';
-	  }
-	  else return ""; 
-  }
-  
-  // escape path for passing to id3v2 as command-line parameter.
-  function escaped(path)
+// Display title and hyperlink(s) for one item in current directory.
+function libLink(path) {
+  var stat = fs.statSync(path);
+  if (stat.isDirectory())
   {
-	  return path.replace(/([ &'\(\)])/g, "\\$1");
+	  // Display directory link(s)
+	  var urlpath = path.split('/').pop();
+	  // Display directory name in hyperlink to 'cd' to that directory.
+	  var result = '<a href="./cd?dir=' + encodeURIComponent(path) + '">' + urlpath + '</a>';
+	  // Check for any mp3 files in the directory...
+	  var files = fs.readdirSync(path);
+	  for (j = 0; j < files.length; j++)
+	  {
+		  // If any, include a 'playdir' link, to play all of them.
+		if (/\.mp3$/.test(files[j])) {
+			result += '<a href="./playdir?path=' + encodeURIComponent(path) + '"> (Play)</a>';
+			break;
+		} 
+	  }
+	  return result;
   }
-  
-	// Request handler callback
-  function onRequest(request, response) {
+  else if (/\.mp3$/.test(path))
+  {
+	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
+	  return '<p><a href="./play?path=' + encodeURIComponent(path) + '">' + 
+				(trackNames[path] || path) + '</a>';
+  }
+  else return ""; 
+}
+
+// escape path for passing to id3v2 as command-line parameter.
+function escaped(path)
+{
+  return path.replace(/([ &'\(\)])/g, "\\$1");
+}
+
+// Request handler callback
+function onRequest(request, response) {
 	var requestURL = url.parse(request.url,true);
-    var pathname = requestURL.pathname;
-	if (pathname == '/play') {
-		route(handle, pathname, decodeURIComponent(requestURL.query.file));
-	}
-	else if (pathname == '/playdir') {
-		route(handle, pathname, decodeURIComponent(requestURL.query.dir));
-	}
-	else if (pathname == '/cd') {
+	var urlpath = requestURL.pathname.substr(1);
+	console.log('urlpath = ' + urlpath);
+	switch (urlpath)
+	{
+	case 'play':
+	case 'playdir':
+	case 'stop':
+		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
+		displayPage(response);
+		break;
+	case 'cd':
 		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.dir));
 		// Get id3 tags
 		var cmd = "id3v2 -R " + escaped(musicpath) + "/*.mp3";
@@ -142,19 +149,12 @@ function start(route, handle) {
 				displayPage(response);
 			}
 		);
-	}
-	else if (pathname == '/') {
+		break;
+	default:
 		// Just refresh the page.
 		displayPage(response);
 	}
-    else {
-		// Catch-all..
-		route(handle, pathname);
-	}
-  } // onRequest
-  
-  http.createServer(onRequest).listen(8889);
-  console.log("piPlayer server started.");
-}
+} // onRequest
 
-exports.start = start;
+http.createServer(onRequest).listen(8889);
+console.log("piPlayer server started.");
