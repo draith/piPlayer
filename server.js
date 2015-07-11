@@ -76,7 +76,7 @@ function displayPage(response)
 	var diffPath = musicpath.substr(linkPath.length+1).split('/');
 	while (linkPath != musicpath)
 	{
-		response.write(libLink(linkPath));
+		response.write(dirLink(linkPath));
 		linkPath = linkPath + '/' + diffPath.shift();
 		if (linkPath != musicpath)
 		{
@@ -91,7 +91,7 @@ function displayPage(response)
 	var files = fs.readdirSync(musicpath);
 	for (i = 0; i < files.length; i++)
 	{
-		response.write('<p>' + libLink(musicpath + '/' + files[i]) + '</p>');
+		response.write(libLink(musicpath + '/' + files[i]));
 	}
 	response.write('</div>');
 	response.write(pagebot);
@@ -99,15 +99,21 @@ function displayPage(response)
 	
 } // displayPage
 
+function dirLink(path)
+{
+  // Display directory link(s)
+  var name = path.split('/').pop();
+  // Display directory name in hyperlink to 'cd' to that directory.
+  return '<a href="./cd?dir=' + encodeURIComponent(path) + '">' + name + '</a>';
+}
+
 // Display title and hyperlink(s) for one item in current directory.
 function libLink(path) {
   var stat = fs.statSync(path);
   if (stat.isDirectory())
   {
-	  // Display directory link(s)
-	  var urlpath = path.split('/').pop();
 	  // Display directory name in hyperlink to 'cd' to that directory.
-	  var result = '<a href="./cd?dir=' + encodeURIComponent(path) + '">' + urlpath + '</a>';
+	  var result = '<p>' + dirLink(path);
 	  // Check for any mp3 files in the directory...
 	  var files = fs.readdirSync(path);
 	  for (j = 0; j < files.length; j++)
@@ -118,13 +124,16 @@ function libLink(path) {
 			break;
 		} 
 	  }
+	  result += '</p>';
 	  return result;
   }
   else if (/\.mp3$/.test(path))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  return '<p><a href="./playdir?path=' + encodeURIComponent(path) + '">' + 
-				(trackNames[path] || path) + '</a>';
+				(trackNames[path] || path) + '</a></p>';
+	  // return '<p class="active" onclick="xmlrequest(\'./playdir?path=' + encodeURIComponent(path) + '\')">' + 
+				// (trackNames[path] || path) + '</p>';
   }
   else return ""; 
 }
@@ -151,11 +160,12 @@ function onRequest(request, response)
 		break;
 	case 'playdir':
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
+		// xmlResponse = response;
 		displayPage(response);
 		break;
 	case 'cd':
 		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.dir));
-		// Get id3 tags
+		// Get id3 tags and refresh page.
 		var cmd = "id3v2 -R " + escaped(musicpath) + "/*.mp3";
 		exec(cmd, { timeout: 5000 },
 			function (error, stdout, stderr) {

@@ -46,13 +46,13 @@ function pause() {
 	if (status.playing)
 	{
 		omx.pause();
-	process.send('paused');
+		process.send('paused');
 	}
 	else if (status.current)
 	{
 		console.log('Not playing: start again.');
 		omx.play();
-	process.send('unpaused');
+		process.send('unpaused');
 	}
 }
 
