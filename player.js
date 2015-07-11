@@ -7,6 +7,7 @@ var playDirPath = '';
 function stop() {
 	console.log("Request handler 'stop' was called.");
 	plist = [];
+	playDirPath = '';
 	if (omx.isPlaying())
 	{
 		omx.stop();
@@ -41,14 +42,17 @@ function stopAndPlayNext()
 
 function pause() {
 	console.log("Request handler 'pause' was called.");
-	if (omx.isPlaying())
+	var status = omx.getStatus();
+	if (status.playing)
 	{
 		omx.pause();
+	process.send('paused');
 	}
-	else
+	else if (status.current)
 	{
 		console.log('Not playing: start again.');
 		omx.play();
+	process.send('unpaused');
 	}
 }
 
@@ -62,16 +66,39 @@ function playnext() {
 
 function playdir(path) {
 	console.log("Request handler 'playdir' was called.");
-	playDirPath = path;
-	var files = fs.readdirSync(path);
-	plist = [];
-	for (i = 0; i < files.length; i++)
-	{
-		if (/\.mp3$/.test(files[i])) {
-			plist[i] = path + '/' + files[i];
-		}
+	var filename = '';
+	if (/\.mp3$/.test(path)) {
+		filename = path.split('/').pop();
+		path = path.substr(0, path.lastIndexOf('/'));
 	}
 	nextIndex = 0;
+	if (path != playDirPath)
+	{
+		// update plist with list of mp3 files in directory 
+		playDirPath = path;
+		var files = fs.readdirSync(path);
+		plist = [];
+		for (i = 0; i < files.length; i++)
+		{
+			if (/\.mp3$/.test(files[i])) {
+				plist[i] = path + '/' + files[i];
+				if (files[i] == filename) {
+					nextIndex = i;
+				}
+			}
+		}
+	}
+	else if (filename.length > 0)
+	{
+		// Set nextIndex to filename position in existing plist
+		for (i = 0; i < plist.length; i++)
+		{
+			if (plist[i].split('/').pop() == filename) {
+				nextIndex = i;
+				break;
+			}
+		}
+	}
 	stopAndPlayNext();
 }
 
@@ -82,15 +109,16 @@ process.on('message', function(message) {
 	switch (message.command) {
 	case 'playdir':
 		playdir(message.arg);
+	process.send('OK ' + message.command);
 		break;
-	case 'play':
-		playOne(message.arg);
+	case 'pause':
+		pause();
 		break;
 	case 'stop':
 		stop();
+	process.send('OK ' + message.command);
 		break;
 	}
 	
-	process.send('OK ' + message.command);
 	
 });

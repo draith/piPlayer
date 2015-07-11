@@ -1,6 +1,8 @@
 var http = require("http");
 var url = require("url");
 var fs = require("fs");
+var pagetop = fs.readFileSync('pagetop.html');
+var pagebot = fs.readFileSync('pagebot.html');
 var index;
 var musicroot = "/home/pi/Downloads/Music";
 var musicpath = musicroot;
@@ -8,9 +10,16 @@ var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
 var player = child_process.fork('./player');
+var xmlResponse;
 
 player.on('message', function(message) {
 	console.log('Received from child: ' + message);
+	if (xmlResponse)
+	{
+		console.log('Sending xml response.');
+		xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
+		xmlResponse.end(message);
+	}
 });
 
 // Populates trackNames as map from filename to track title,
@@ -57,7 +66,8 @@ function parseID3(id3Output) {
 	}
 }
 
-function displayPage(response) {
+function displayPage(response) 
+{
 	response.writeHead(200, {"Content-Type": "text/html"});
 	response.write(fs.readFileSync('pagetop.html'));
 	// Display directory links...
@@ -84,7 +94,7 @@ function displayPage(response) {
 		response.write('<p>' + libLink(musicpath + '/' + files[i]) + '</p>');
 	}
 	response.write('</div>');
-	response.write(fs.readFileSync('pagebot.html'));
+	response.write(pagebot);
 	response.end();
 	
 } // displayPage
@@ -113,7 +123,7 @@ function libLink(path) {
   else if (/\.mp3$/.test(path))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-	  return '<p><a href="./play?path=' + encodeURIComponent(path) + '">' + 
+	  return '<p><a href="./playdir?path=' + encodeURIComponent(path) + '">' + 
 				(trackNames[path] || path) + '</a>';
   }
   else return ""; 
@@ -126,15 +136,20 @@ function escaped(path)
 }
 
 // Request handler callback
-function onRequest(request, response) {
+function onRequest(request, response) 
+{
 	var requestURL = url.parse(request.url,true);
 	var urlpath = requestURL.pathname.substr(1);
 	console.log('urlpath = ' + urlpath);
+	xmlResponse = false;
 	switch (urlpath)
 	{
-	case 'play':
-	case 'playdir':
+	case 'pause':
 	case 'stop':
+		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
+		xmlResponse = response;
+		break;
+	case 'playdir':
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
 		displayPage(response);
 		break;
