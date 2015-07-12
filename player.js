@@ -14,8 +14,7 @@ function stop() {
 	}
 }
 
-function play(path) {
-	console.log("Request handler 'play' was called, path = " + path);
+function playFile(path) {
 	omx.play(path,{'-o': 'local', '--vol': '-300'});
 }
 
@@ -60,7 +59,7 @@ function playnext() {
 	console.log('playnext called, plist.length = ' + plist.length + ', nextIndex = ' + nextIndex);
 	if (plist.length > nextIndex)
 	{
-		play(plist[nextIndex++]);
+		playFile(plist[nextIndex++]);
 	}
 }
 
@@ -108,6 +107,7 @@ process.on('message', function(message) {
 	console.log('Child received command: ' + message.command + ', arg: ' + message.arg);
 	switch (message.command) {
 	case 'playdir':
+	case 'play':
 		playdir(message.arg);
 	process.send('OK ' + message.command);
 		break;

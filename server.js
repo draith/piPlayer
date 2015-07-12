@@ -11,6 +11,7 @@ var exec = child_process.exec;
 var trackNames = [];
 var player = child_process.fork('./player');
 var xmlResponse;
+var urlpath;
 
 player.on('message', function(message) {
 	console.log('Received from child: ' + message);
@@ -104,7 +105,7 @@ function dirLink(path)
   // Display directory link(s)
   var name = path.split('/').pop();
   // Display directory name in hyperlink to 'cd' to that directory.
-  return '<a href="./cd?dir=' + encodeURIComponent(path) + '">' + name + '</a>';
+  return '<a href="./cd?path=' + encodeURIComponent(path) + '">' + name + '</a>';
 }
 
 // Display title and hyperlink(s) for one item in current directory.
@@ -130,9 +131,9 @@ function libLink(path) {
   else if (/\.mp3$/.test(path))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-	  return '<p><a href="./playdir?path=' + encodeURIComponent(path) + '">' + 
+	  return '<p><a href="./play?path=' + encodeURIComponent(path) + '">' + 
 				(trackNames[path] || path) + '</a></p>';
-	  // return '<p class="active" onclick="xmlrequest(\'./playdir?path=' + encodeURIComponent(path) + '\')">' + 
+	  // return '<p class="active" onclick="xmlrequest(\'./play?path=' + encodeURIComponent(path) + '\')">' + 
 				// (trackNames[path] || path) + '</p>';
   }
   else return ""; 
@@ -148,7 +149,7 @@ function escaped(path)
 function onRequest(request, response) 
 {
 	var requestURL = url.parse(request.url,true);
-	var urlpath = requestURL.pathname.substr(1);
+	urlpath = requestURL.pathname.substr(1);
 	console.log('urlpath = ' + urlpath);
 	xmlResponse = false;
 	switch (urlpath)
@@ -158,19 +159,25 @@ function onRequest(request, response)
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
 		xmlResponse = response;
 		break;
-	case 'playdir':
+	case 'play':
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
 		// xmlResponse = response;
 		displayPage(response);
 		break;
 	case 'cd':
-		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.dir));
+	case 'playdir':
+		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
 		// Get id3 tags and refresh page.
 		var cmd = "id3v2 -R " + escaped(musicpath) + "/*.mp3";
 		exec(cmd, { timeout: 5000 },
 			function (error, stdout, stderr) {
 				// Get title tags for display
 				parseID3(stdout);
+				if (urlpath == 'playdir')
+				{
+		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
+		// xmlResponse = response;
+				}
 				displayPage(response);
 			}
 		);
