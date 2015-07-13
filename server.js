@@ -173,12 +173,12 @@ function onRequest(request, response)
 			function (error, stdout, stderr) {
 				// Get title tags for display
 				parseID3(stdout);
+				displayPage(response);
 				if (urlpath == 'playdir')
 				{
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
 		// xmlResponse = response;
 				}
-				displayPage(response);
 			}
 		);
 		break;
