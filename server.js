@@ -13,6 +13,7 @@ var player = child_process.fork('./player');
 var xmlResponse;
 var urlpath;
 
+// Pass messages from player back to client if it's waiting for an XMLresponse..
 player.on('message', function(message) {
 	console.log('Received from child: ' + message);
 	if (xmlResponse)
@@ -20,6 +21,8 @@ player.on('message', function(message) {
 		console.log('Sending xml response.');
 		xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
 		xmlResponse.end(message);
+		// Ensure we don't respond twice.
+		xmlResponse = null;
 	}
 });
 
@@ -102,9 +105,8 @@ function displayPage(response)
 
 function dirLink(path)
 {
-  // Display directory link(s)
-  var name = path.split('/').pop();
   // Display directory name in hyperlink to 'cd' to that directory.
+  var name = path.split('/').pop();
   return '<a href="./cd?path=' + encodeURIComponent(path) + '">' + name + '</a>';
 }
 
@@ -131,10 +133,8 @@ function libLink(path) {
   else if (/\.mp3$/.test(path))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-	  return '<p><a href="./play?path=' + encodeURIComponent(path) + '">' + 
-				(trackNames[path] || path) + '</a></p>';
-	  // return '<p class="active" onclick="xmlrequest(\'./play?path=' + encodeURIComponent(path) + '\')">' + 
-				// (trackNames[path] || path) + '</p>';
+	  return '<p class="active" id="' + encodeURIComponent(path) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
+				(trackNames[path] || path) + '</p>';
   }
   else return ""; 
 }
@@ -161,8 +161,11 @@ function onRequest(request, response)
 		break;
 	case 'play':
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
-		// xmlResponse = response;
-		displayPage(response);
+		xmlResponse = response;
+		break;
+	case 'monitor':
+		// Request to pass back next signal from player.
+		xmlResponse = response;
 		break;
 	case 'cd':
 	case 'playdir':
@@ -174,13 +177,20 @@ function onRequest(request, response)
 				// Get title tags for display
 				parseID3(stdout);
 				displayPage(response);
+				// TODO: Instead of this, pass urlpath to displayPage, and set body/onload
+				// to send playdir XMLrequest when urlpath is playdir.
 				if (urlpath == 'playdir')
 				{
-		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
-		// xmlResponse = response;
+					player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
+					xmlResponse = response;
 				}
 			}
 		);
+		break;
+	case 'favicon.ico':
+	    response.writeHead(404, {"Content-Type": "text/plain"});
+		response.write("404 Not found");
+		response.end();
 		break;
 	default:
 		// Just refresh the page.

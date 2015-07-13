@@ -14,24 +14,6 @@ function stop() {
 	}
 }
 
-function playFile(path) {
-	omx.play(path,{'-o': 'local', '--vol': '-300'});
-}
-
-function stopAndPlayNext()
-{
-	if (omx.isPlaying())
-	{
-		console.log('stopAndPlayNext calling stop');
-		omx.stop();
-	}
-	else
-	{
-		console.log('stopAndPlayNext calling playnext');
-		playnext();
-	}
-}
-
 function pause() {
 	console.log("Request handler 'pause' was called.");
 	var status = omx.getStatus();
@@ -48,11 +30,21 @@ function pause() {
 	}
 }
 
+function playFile(path) {
+	omx.play(path,{'-o': 'local', '--vol': '-300'});
+}
+
 function playnext() {
 	console.log('playnext called, plist.length = ' + plist.length + ', nextIndex = ' + nextIndex);
 	if (nextIndex < plist.length)
 	{
-		playFile(plist[nextIndex++]);
+		var filename = plist[nextIndex++];
+		playFile(filename);
+		process.send('playing:' + filename);
+	}
+	else
+	{
+		process.send('end');
 	}
 }
 
@@ -70,6 +62,20 @@ function updatePlist(path)
 				plist[i] = path + '/' + files[i];
 			}
 		}
+	}
+}
+
+function stopAndPlayNext()
+{
+	if (omx.isPlaying())
+	{
+		console.log('stopAndPlayNext calling stop');
+		omx.stop();
+	}
+	else
+	{
+		console.log('stopAndPlayNext calling playnext');
+		playnext();
 	}
 }
 
@@ -106,18 +112,16 @@ process.on('message', function(message) {
 	switch (message.command) {
 	case 'playdir':
 		playdir(message.arg);
-		process.send('OK ' + message.command);
 		break;
 	case 'play':
 		play(message.arg);
-		process.send('OK ' + message.command);
 		break;
 	case 'pause':
 		pause();
 		break;
 	case 'stop':
 		stop();
-	process.send('OK ' + message.command);
+		process.send('OK ' + message.command);
 		break;
 	}
 });
