@@ -18,13 +18,6 @@ function playFile(path) {
 	omx.play(path,{'-o': 'local', '--vol': '-300'});
 }
 
-function playOne(path) {
-	console.log("Request handler 'playOne' was called.");
-	plist = [path];
-	nextIndex = 0;
-	stopAndPlayNext();
-}
-
 function stopAndPlayNext()
 {
 	if (omx.isPlaying())
@@ -57,23 +50,17 @@ function pause() {
 
 function playnext() {
 	console.log('playnext called, plist.length = ' + plist.length + ', nextIndex = ' + nextIndex);
-	if (plist.length > nextIndex)
+	if (nextIndex < plist.length)
 	{
 		playFile(plist[nextIndex++]);
 	}
 }
 
-function playdir(path) {
-	console.log("Request handler 'playdir' was called.");
-	var filename = '';
-	if (/\.mp3$/.test(path)) {
-		filename = path.split('/').pop();
-		path = path.substr(0, path.lastIndexOf('/'));
-	}
-	nextIndex = 0;
+function updatePlist(path) 
+{
+	// update plist with list of mp3 files in directory 
 	if (path != playDirPath)
 	{
-		// update plist with list of mp3 files in directory 
 		playDirPath = path;
 		var files = fs.readdirSync(path);
 		plist = [];
@@ -81,21 +68,32 @@ function playdir(path) {
 		{
 			if (/\.mp3$/.test(files[i])) {
 				plist[i] = path + '/' + files[i];
-				if (files[i] == filename) {
-					nextIndex = i;
-				}
 			}
 		}
 	}
-	else if (filename.length > 0)
+}
+
+function playdir(path) 
+{
+	console.log("Request handler 'playdir' was called.");
+	updatePlist(path);
+	nextIndex = 0;
+	stopAndPlayNext();
+}
+
+function play(path) 
+{
+	console.log("Request handler 'play' was called.");
+	var filename = path.split('/').pop();
+	path = path.substr(0, path.lastIndexOf('/'));
+	updatePlist(path);
+	// Set nextIndex to filename position in existing plist
+	nextIndex = 0;
+	for (i = 0; i < plist.length; i++)
 	{
-		// Set nextIndex to filename position in existing plist
-		for (i = 0; i < plist.length; i++)
-		{
-			if (plist[i].split('/').pop() == filename) {
-				nextIndex = i;
-				break;
-			}
+		if (plist[i].split('/').pop() == filename) {
+			nextIndex = i;
+			break;
 		}
 	}
 	stopAndPlayNext();
@@ -107,9 +105,12 @@ process.on('message', function(message) {
 	console.log('Child received command: ' + message.command + ', arg: ' + message.arg);
 	switch (message.command) {
 	case 'playdir':
-	case 'play':
 		playdir(message.arg);
-	process.send('OK ' + message.command);
+		process.send('OK ' + message.command);
+		break;
+	case 'play':
+		play(message.arg);
+		process.send('OK ' + message.command);
 		break;
 	case 'pause':
 		pause();
@@ -119,6 +120,4 @@ process.on('message', function(message) {
 	process.send('OK ' + message.command);
 		break;
 	}
-	
-	
 });
