@@ -5,12 +5,11 @@
 	<style>
 		a,p,span { font-size: 60px; font-family: sans-serif; margin : 20px; } 
 		.active { cursor: pointer; color: rgb(85,26,139); text-decoration: underline }
-		.playing { font: emphasise; background-color: white; }
 		div#scrolling { overflow: auto;  background-color: #cc9; }
 	    html, body { overflow: hidden; height: 100% }
         body { margin:0; padding:0; }
 		div#top { background-color: #bdd; border-bottom: solid #bdd }
-		p.title { color: green; font-style: italic; text-shadow: 2px 2px #333 }
+		p.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
 	</style>
 	<script>
 	var scrolldiv;
@@ -45,6 +44,8 @@
 					break;
 				case 'unpaused':
 					document.getElementById('pause').innerHTML = 'Pause';
+					break;
+				case 'stop':
 					break;
 				case 'end':
 					// If the playing track was highlighted, unhighlight it.
@@ -89,9 +90,4 @@
 	}
 	</script>
 </head>
-<body>
-<div id='top'>
-<a href='./'>Refresh</a>
-<span class="active" id='pause' onclick="xmlrequest('pause')">Pause</span>
-<span class="active" id='stop' onclick="xmlrequest('stop')">Stop</span>
-<br/>
+

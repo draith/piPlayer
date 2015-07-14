@@ -121,7 +121,7 @@ process.on('message', function(message) {
 		break;
 	case 'stop':
 		stop();
-		process.send('OK ' + message.command);
+		process.send('stop');
 		break;
 	}
 });

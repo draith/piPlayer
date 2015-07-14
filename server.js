@@ -6,6 +6,7 @@ var pagebot = fs.readFileSync('pagebot.html');
 var index;
 var musicroot = "/home/pi/Downloads/Music";
 var musicpath = musicroot;
+var playingfile;
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
@@ -18,6 +19,16 @@ player.on('message', function(message) {
 	console.log('Received from child: ' + message);
 	if (xmlResponse)
 	{
+		// Keep track of currently playing filename.
+		if (message == 'end') {
+			playingfile = false;
+		} else {
+			var splitResponse = message.split(':');
+			if (splitResponse.length == 2 && splitResponse[0] == 'playing')
+			{
+				playingfile = splitResponse[1];
+			}
+		}
 		console.log('Sending xml response.');
 		xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
 		xmlResponse.end(message);
@@ -75,6 +86,16 @@ function displayPage(response)
 	response.writeHead(200, {"Content-Type": "text/html"});
 	response.write(fs.readFileSync('pagetop.html'));
 	// Display directory links...
+	if (urlpath == 'cdplaydir') {
+		response.write('<body id="' + encodeURIComponent(musicpath) + '" onload="xmlrequest(\'./playdir?path=\' + this.id)">');
+	} else {
+		response.write('<body>');
+	}
+	response.write("<div id='top'>" +
+	"<a href='./'>Refresh</a>" +
+	'<span class="active" id="pause" onclick="xmlrequest(\'pause\')">Pause</span>' +
+	'<span class="active" id="stop" onclick="xmlrequest(\'stop\')">Stop</span>' +
+	'<br/>');
 	response.write("<p>");
 	var linkPath = musicroot;
 	var diffPath = musicpath.substr(linkPath.length+1).split('/');
@@ -121,9 +142,9 @@ function libLink(path) {
 	  var files = fs.readdirSync(path);
 	  for (j = 0; j < files.length; j++)
 	  {
-		  // If any, include a 'playdir' link, to play all of them.
+		  // If any, include a 'cdplaydir' link, to play all of them.
 		if (/\.mp3$/.test(files[j])) {
-			result += '<a href="./playdir?path=' + encodeURIComponent(path) + '"> (Play)</a>';
+			result += '<a href="./cdplaydir?path=' + encodeURIComponent(path) + '"> (Play)</a>';
 			break;
 		} 
 	  }
@@ -133,7 +154,8 @@ function libLink(path) {
   else if (/\.mp3$/.test(path))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-	  return '<p class="active" id="' + encodeURIComponent(path) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
+	  var pclass = (path == playingfile ? 'active playing' : 'active');
+	  return '<p class="' + pclass + '" id="' + encodeURIComponent(path) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
 				(trackNames[path] || path) + '</p>';
   }
   else return ""; 
@@ -168,7 +190,7 @@ function onRequest(request, response)
 		xmlResponse = response;
 		break;
 	case 'cd':
-	case 'playdir':
+	case 'cdplaydir':
 		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
 		// Get id3 tags and refresh page.
 		var cmd = "id3v2 -R " + escaped(musicpath) + "/*.mp3";
@@ -177,15 +199,12 @@ function onRequest(request, response)
 				// Get title tags for display
 				parseID3(stdout);
 				displayPage(response);
-				// TODO: Instead of this, pass urlpath to displayPage, and set body/onload
-				// to send playdir XMLrequest when urlpath is playdir.
-				if (urlpath == 'playdir')
-				{
-					player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
-					xmlResponse = response;
-				}
 			}
 		);
+		break;
+	case 'playdir':
+		player.send({command: urlpath, arg: musicpath});
+		xmlResponse = response;
 		break;
 	case 'favicon.ico':
 	    response.writeHead(404, {"Content-Type": "text/plain"});
