@@ -3,6 +3,7 @@ var fs = require('fs');
 var plist = [];
 var nextIndex = 0;
 var playDirPath = '';
+var started = false;
 
 function stop() {
 	console.log("Request handler 'stop' was called.");
@@ -31,6 +32,11 @@ function pause() {
 }
 
 function playFile(path) {
+	if (!started)
+	{
+		omx.enableHangingHandler();
+		started = true;
+	}
 	omx.play(path,{'-o': 'local', '--vol': '-300'});
 }
 

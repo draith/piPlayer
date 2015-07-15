@@ -6,7 +6,7 @@ var pagebot = fs.readFileSync('pagebot.html');
 var index;
 var musicroot = "/home/pi/Downloads/Music";
 var musicpath = musicroot;
-var playingfile;
+var playingfile = false;
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
@@ -20,7 +20,7 @@ player.on('message', function(message) {
 	if (xmlResponse)
 	{
 		// Keep track of currently playing filename.
-		if (message == 'end') {
+		if (message == 'end' || message == 'stop') {
 			playingfile = false;
 		} else {
 			var splitResponse = message.split(':');
@@ -87,7 +87,11 @@ function displayPage(response)
 	response.write(fs.readFileSync('pagetop.html'));
 	// Display directory links...
 	if (urlpath == 'cdplaydir') {
-		response.write('<body id="' + encodeURIComponent(musicpath) + '" onload="xmlrequest(\'./playdir?path=\' + this.id)">');
+		response.write('<body id="' + encodeURIComponent(musicpath) +
+		'" onload="xmlrequest(\'./playdir?path=\' + this.id)">');
+	} else if (playingfile) {
+		response.write('<body playing="' + encodeURIComponent(playingfile) +
+		'" onload="initPlaying()">');
 	} else {
 		response.write('<body>');
 	}
@@ -216,6 +220,11 @@ function onRequest(request, response)
 		displayPage(response);
 	}
 } // onRequest
+
+process.on('exit', function() {
+	console.log('Shutting down: killing player.');
+	player.kill();
+});
 
 http.createServer(onRequest).listen(8889);
 console.log("piPlayer server started.");

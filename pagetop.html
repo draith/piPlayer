@@ -46,7 +46,6 @@
 					document.getElementById('pause').innerHTML = 'Pause';
 					break;
 				case 'stop':
-					break;
 				case 'end':
 					// If the playing track was highlighted, unhighlight it.
 					elt = document.getElementById(playingId);
@@ -87,6 +86,12 @@
 			}
 		};
 		xmlhttp.send();
+	} // xmlrequest
+	
+	function initPlaying()
+	{
+		playingId = document.getElementsByTagName("BODY")[0].getAttribute("playing");
+		xmlrequest("./monitor");
 	}
 	</script>
 </head>
