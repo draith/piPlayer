@@ -13,6 +13,7 @@ function stop() {
 	{
 		omx.stop();
 	}
+	process.send('stop');
 }
 
 function pause() {
@@ -56,6 +57,7 @@ function playnext() {
 
 function updatePlist(path) 
 {
+	console.log('updatePlist(' + path + ')');
 	// update plist with list of mp3 files in directory 
 	if (path != playDirPath)
 	{
@@ -87,7 +89,7 @@ function stopAndPlayNext()
 
 function playdir(path) 
 {
-	console.log("Request handler 'playdir' was called.");
+	console.log("player: playdir(" + path + ") called.");
 	updatePlist(path);
 	nextIndex = 0;
 	stopAndPlayNext();
@@ -97,8 +99,8 @@ function play(path)
 {
 	console.log("Request handler 'play' was called.");
 	var filename = path.split('/').pop();
-	path = path.substr(0, path.lastIndexOf('/'));
-	updatePlist(path);
+	console.log('filename = ' + filename);
+	updatePlist(path.substr(0, path.lastIndexOf('/')));
 	// Set nextIndex to filename position in existing plist
 	nextIndex = 0;
 	for (i = 0; i < plist.length; i++)
@@ -127,7 +129,6 @@ process.on('message', function(message) {
 		break;
 	case 'stop':
 		stop();
-		process.send('stop');
 		break;
 	}
 });

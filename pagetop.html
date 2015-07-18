@@ -61,7 +61,7 @@
 					{
 						// Update highlighting of currently playing track.
 						var playId = encodeURIComponent(splitResponse[1]);
-						if (playId != playingId && playingId)
+						if ((playId != playingId) && playingId)
 						{
 							elt = document.getElementById(playingId);
 							if (elt)
@@ -73,8 +73,14 @@
 						if (elt)
 						{
 							elt.className = "active playing";
-							playingId = playId;
+							if (elt.offsetTop + elt.offsetHeight > scrolldiv.scrollTop + scrolldiv.offsetHeight)
+							{
+								// scroll down to keep element in view, if needed
+								// Display current track plus preceding one.
+								scrolldiv.scrollTop = playingTrackRow.offsetTop - scrolldiv.offsetTop - playingTrackRow.offsetHeight;
+							}
 						}
+						playingId = playId;
 						// Listen for end of track / next track.
 						xmlrequest('monitor');
 					}
@@ -92,6 +98,12 @@
 	{
 		playingId = document.getElementsByTagName("BODY")[0].getAttribute("playing");
 		xmlrequest("./monitor");
+		var playingTrackRow = document.getElementById(playingId);
+		if (playingTrackRow)
+		{
+			// Display current track plus preceding one.
+			scrolldiv.scrollTop = playingTrackRow.offsetTop - scrolldiv.offsetTop - playingTrackRow.offsetHeight;
+		}
 	}
 	</script>
 </head>

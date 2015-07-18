@@ -87,10 +87,9 @@ function displayPage(response)
 	response.write(fs.readFileSync('pagetop.html'));
 	// Display directory links...
 	if (urlpath == 'cdplaydir') {
-		response.write('<body id="' + encodeURIComponent(musicpath) +
-		'" onload="xmlrequest(\'./playdir?path=\' + this.id)">');
+		response.write('<body onload="xmlrequest(\'playdir\')">');
 	} else if (playingfile) {
-		response.write('<body playing="' + encodeURIComponent(playingfile) +
+		response.write('<body playing="' + quotEscaped(encodeURIComponent(playingfile)) +
 		'" onload="initPlaying()">');
 	} else {
 		response.write('<body>');
@@ -128,6 +127,19 @@ function displayPage(response)
 	
 } // displayPage
 
+function getTracksAndDisplayPage(response)
+{
+	// Get id3 tags and refresh page.
+	var cmd = "id3v2 -R " + bashEscaped(musicpath) + "/*.mp3";
+	exec(cmd, { timeout: 5000 },
+		function (error, stdout, stderr) {
+			// Get title tags for display
+			parseID3(stdout);
+			displayPage(response);
+		}
+	);
+}
+
 function dirLink(path)
 {
   // Display directory name in hyperlink to 'cd' to that directory.
@@ -159,16 +171,22 @@ function libLink(path) {
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  var pclass = (path == playingfile ? 'active playing' : 'active');
-	  return '<p class="' + pclass + '" id="' + encodeURIComponent(path) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
+	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(path)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
 				(trackNames[path] || path) + '</p>';
   }
   else return ""; 
 }
 
 // escape path for passing to id3v2 as command-line parameter.
-function escaped(path)
+function bashEscaped(path)
 {
   return path.replace(/([ &'\(\)])/g, "\\$1");
+}
+
+// encode quotation characters in literal html string 
+function quotEscaped(path)
+{
+  return path.replace(/"/g, "&quot;");
 }
 
 // Request handler callback
@@ -196,15 +214,7 @@ function onRequest(request, response)
 	case 'cd':
 	case 'cdplaydir':
 		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
-		// Get id3 tags and refresh page.
-		var cmd = "id3v2 -R " + escaped(musicpath) + "/*.mp3";
-		exec(cmd, { timeout: 5000 },
-			function (error, stdout, stderr) {
-				// Get title tags for display
-				parseID3(stdout);
-				displayPage(response);
-			}
-		);
+		getTracksAndDisplayPage(response);
 		break;
 	case 'playdir':
 		player.send({command: urlpath, arg: musicpath});
@@ -216,8 +226,12 @@ function onRequest(request, response)
 		response.end();
 		break;
 	default:
-		// Just refresh the page.
-		displayPage(response);
+		// Refresh the page.
+		if (playingfile)
+		{	// Display currently-playing directory, if any..
+			musicpath = playingfile.substr(0,playingfile.lastIndexOf('/'));
+		}
+		getTracksAndDisplayPage(response);
 	}
 } // onRequest
 
