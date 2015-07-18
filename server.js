@@ -1,6 +1,8 @@
 var http = require("http");
 var url = require("url");
 var fs = require("fs");
+var path = require("path");
+var mimetypes = require("mime-types");
 var pagetop = fs.readFileSync('pagetop.html');
 var pagebot = fs.readFileSync('pagebot.html');
 var index;
@@ -39,7 +41,8 @@ player.on('message', function(message) {
 
 // Populates trackNames as map from filename to track title,
 // from id3v2 output.
-function parseID3(id3Output) {
+function parseID3(id3Output) 
+{
 	var lines = id3Output.split('\n');
 	var filename = false;
 	trackNames = [];
@@ -140,53 +143,53 @@ function getTracksAndDisplayPage(response)
 	);
 }
 
-function dirLink(path)
+function dirLink(pathname)
 {
   // Display directory name in hyperlink to 'cd' to that directory.
-  var name = path.split('/').pop();
-  return '<a href="./cd?path=' + encodeURIComponent(path) + '">' + name + '</a>';
+  var name = pathname.split('/').pop();
+  return '<a href="./cd?path=' + encodeURIComponent(pathname) + '">' + name + '</a>';
 }
 
 // Display title and hyperlink(s) for one item in current directory.
-function libLink(path) {
-  var stat = fs.statSync(path);
+function libLink(pathname) {
+  var stat = fs.statSync(pathname);
   if (stat.isDirectory())
   {
 	  // Display directory name in hyperlink to 'cd' to that directory.
-	  var result = '<p>' + dirLink(path);
+	  var result = '<p>' + dirLink(pathname);
 	  // Check for any mp3 files in the directory...
-	  var files = fs.readdirSync(path);
+	  var files = fs.readdirSync(pathname);
 	  for (j = 0; j < files.length; j++)
 	  {
 		  // If any, include a 'cdplaydir' link, to play all of them.
 		if (/\.mp3$/.test(files[j])) {
-			result += '<a href="./cdplaydir?path=' + encodeURIComponent(path) + '"> (Play)</a>';
+			result += '<a href="./cdplaydir?path=' + encodeURIComponent(pathname) + '"> (Play)</a>';
 			break;
 		} 
 	  }
 	  result += '</p>';
 	  return result;
   }
-  else if (/\.mp3$/.test(path))
+  else if (/\.mp3$/.test(pathname))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-	  var pclass = (path == playingfile ? 'active playing' : 'active');
-	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(path)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
-				(trackNames[path] || path) + '</p>';
+	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
+	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(pathname)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
+				(trackNames[pathname] || pathname) + '</p>';
   }
   else return ""; 
 }
 
 // escape path for passing to id3v2 as command-line parameter.
-function bashEscaped(path)
+function bashEscaped(pathname)
 {
-  return path.replace(/([ &'\(\)])/g, "\\$1");
+  return pathname.replace(/([ &'\(\)])/g, "\\$1");
 }
 
 // encode quotation characters in literal html string 
-function quotEscaped(path)
+function quotEscaped(pathname)
 {
-  return path.replace(/"/g, "&quot;");
+  return pathname.replace(/"/g, "&quot;");
 }
 
 // Request handler callback
@@ -220,18 +223,41 @@ function onRequest(request, response)
 		player.send({command: urlpath, arg: musicpath});
 		xmlResponse = response;
 		break;
-	case 'favicon.ico':
-	    response.writeHead(404, {"Content-Type": "text/plain"});
-		response.write("404 Not found");
-		response.end();
-		break;
-	default:
+	case '':
 		// Refresh the page.
 		if (playingfile)
 		{	// Display currently-playing directory, if any..
 			musicpath = playingfile.substr(0,playingfile.lastIndexOf('/'));
 		}
 		getTracksAndDisplayPage(response);
+		break;
+	default:
+		var filename = path.join(process.cwd(), unescape(urlpath));
+		var stats;
+		var mimeType;
+
+		try {
+			stats = fs.lstatSync(filename); // throws if path doesn't exist
+			mimeType = mimetypes.lookup(filename);
+		} catch (e) {
+			console.log('Non-existent file request: ' + filename);
+			response.writeHead(404, {'Content-Type': 'text/plain'});
+			response.write('404 Not Found\n');
+			response.end();
+			return;
+		}
+
+		if (stats.isFile() && mimeType) {
+			response.writeHead(200, {"Content-Type": mimeType});
+			var fileStream = fs.createReadStream(filename);
+			fileStream.pipe(response);
+		} else {
+			console.log('Bad file request: ' + filename);
+			response.writeHead(500, {'Content-Type': 'text/plain'});
+			response.write('500 Internal server error\n');
+			response.end();
+		}
+		break;
 	}
 } // onRequest
 
