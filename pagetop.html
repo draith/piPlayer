@@ -73,11 +73,11 @@
 						if (elt)
 						{
 							elt.className = "active playing";
-							if (elt.offsetTop + elt.offsetHeight > scrolldiv.scrollTop + scrolldiv.offsetHeight)
+							if (elt.offsetTop + elt.offsetHeight > scrolldiv.offsetTop + scrolldiv.scrollTop + scrolldiv.offsetHeight)
 							{
-								// scroll down to keep element in view, if needed
+								// scroll up to keep element in view, if needed
 								// Display current track plus preceding one.
-								scrolldiv.scrollTop = playingTrackRow.offsetTop - scrolldiv.offsetTop - playingTrackRow.offsetHeight;
+								scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
 							}
 						}
 						playingId = playId;

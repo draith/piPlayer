@@ -6,7 +6,7 @@ var mimetypes = require("mime-types");
 var pagetop = fs.readFileSync('pagetop.html');
 var pagebot = fs.readFileSync('pagebot.html');
 var index;
-var musicroot = "/home/pi/Downloads/Music";
+var musicroot = "/home/pi/usbdrv/Music";
 var musicpath = musicroot;
 var playingfile = false;
 var child_process = require('child_process');
