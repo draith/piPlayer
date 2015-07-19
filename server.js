@@ -19,18 +19,18 @@ var urlpath;
 // Pass messages from player back to client if it's waiting for an XMLresponse..
 player.on('message', function(message) {
 	console.log('Received from child: ' + message);
+	// Keep track of currently playing filename.
+	if (message == 'end' || message == 'stop') {
+		playingfile = false;
+	} else {
+		var splitResponse = message.split(':');
+		if (splitResponse.length > 1 && splitResponse[0] == 'playing')
+		{
+			playingfile = message.substr(message.indexOf(':') + 1);
+		}
+	}
 	if (xmlResponse)
 	{
-		// Keep track of currently playing filename.
-		if (message == 'end' || message == 'stop') {
-			playingfile = false;
-		} else {
-			var splitResponse = message.split(':');
-			if (splitResponse.length == 2 && splitResponse[0] == 'playing')
-			{
-				playingfile = splitResponse[1];
-			}
-		}
 		console.log('Sending xml response.');
 		xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
 		xmlResponse.end(message);
@@ -104,7 +104,7 @@ function displayPage(response)
 	'<br/>');
 	response.write("<p>");
 	var linkPath = musicroot;
-	var diffPath = musicpath.substr(linkPath.length+1).split('/');
+	var diffPath = path.relative(musicroot, musicpath).split('/');
 	while (linkPath != musicpath)
 	{
 		response.write(dirLink(linkPath));
@@ -115,14 +115,13 @@ function displayPage(response)
 		}
 	}
 	// Write title of current directory
-	var dirName = musicpath.split('/').pop();
-	response.write('</p><p class="title">' + dirName + '</p>');
+	response.write('</p><p class="title">' + path.basename(musicpath) + '</p>');
 	// Display contents of current directory in scrolling div.
 	response.write('</div>\n<div id=scrolling>');
 	var files = fs.readdirSync(musicpath);
 	for (i = 0; i < files.length; i++)
 	{
-		response.write(libLink(musicpath + '/' + files[i]));
+		response.write(libLink(path.join(musicpath, files[i])));
 	}
 	response.write('</div>');
 	response.write(pagebot);
@@ -146,8 +145,7 @@ function getTracksAndDisplayPage(response)
 function dirLink(pathname)
 {
   // Display directory name in hyperlink to 'cd' to that directory.
-  var name = pathname.split('/').pop();
-  return '<a href="./cd?path=' + encodeURIComponent(pathname) + '">' + name + '</a>';
+  return '<a href="./cd?path=' + encodeURIComponent(pathname) + '">' + path.basename(pathname) + '</a>';
 }
 
 // Display title and hyperlink(s) for one item in current directory.

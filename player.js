@@ -1,5 +1,6 @@
 var omx = require('omx-manager');
 var fs = require('fs');
+var path = require('path');
 var plist = [];
 var nextIndex = 0;
 var playDirPath = '';
@@ -32,13 +33,13 @@ function pause() {
 	}
 }
 
-function playFile(path) {
+function playFile(filepath) {
 	if (!started)
 	{
 		omx.enableHangingHandler();
 		started = true;
 	}
-	omx.play(path,{'-o': 'local', '--vol': '-300'});
+	omx.play(filepath,{'-o': 'local', '--vol': '-300'});
 }
 
 function playnext() {
@@ -55,19 +56,19 @@ function playnext() {
 	}
 }
 
-function updatePlist(path) 
+function updatePlist(dirpath) 
 {
-	console.log('updatePlist(' + path + ')');
+	console.log('updatePlist(' + dirpath + ')');
 	// update plist with list of mp3 files in directory 
-	if (path != playDirPath)
+	if (dirpath != playDirPath)
 	{
-		playDirPath = path;
-		var files = fs.readdirSync(path);
+		playDirPath = dirpath;
+		var files = fs.readdirSync(dirpath);
 		plist = [];
 		for (i = 0; i < files.length; i++)
 		{
 			if (/\.mp3$/.test(files[i])) {
-				plist[i] = path + '/' + files[i];
+				plist[i] = path.join(dirpath, files[i]);
 			}
 		}
 	}
@@ -87,25 +88,25 @@ function stopAndPlayNext()
 	}
 }
 
-function playdir(path) 
+function playdir(dirpath) 
 {
-	console.log("player: playdir(" + path + ") called.");
-	updatePlist(path);
+	console.log("player: playdir(" + dirpath + ") called.");
+	updatePlist(dirpath);
 	nextIndex = 0;
 	stopAndPlayNext();
 }
 
-function play(path) 
+function play(filepath) 
 {
 	console.log("Request handler 'play' was called.");
-	var filename = path.split('/').pop();
+	var filename = path.basename(filepath);
 	console.log('filename = ' + filename);
-	updatePlist(path.substr(0, path.lastIndexOf('/')));
+	updatePlist(path.dirname(filepath));
 	// Set nextIndex to filename position in existing plist
 	nextIndex = 0;
 	for (i = 0; i < plist.length; i++)
 	{
-		if (plist[i].split('/').pop() == filename) {
+		if (path.basename(plist[i]) == filename) {
 			nextIndex = i;
 			break;
 		}
