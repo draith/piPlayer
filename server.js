@@ -12,6 +12,7 @@ var playingfile = false;
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
+var utf8Names = [];
 var player = child_process.fork('./player');
 var xmlResponse;
 var urlpath;
@@ -44,42 +45,40 @@ player.on('message', function(message) {
 function parseID3(id3Output) 
 {
 	var lines = id3Output.split('\n');
-	var filename = false;
+	var asciifilename = false;
+	var utf8filename;
 	trackNames = [];
 	var i;
 	for (i = 0; i < lines.length; i++)
 	{
-		// Get filename from Filename value.
+		// Get ASCII filename from Filename value.
 		if (/^Filename: /.test(lines[i]))
 		{
-			filename = lines[i].substr(10);
+			asciifilename = path.basename(lines[i].substr(10));
 		}
 		// Get track name from TIT2 value.
-		else if (filename && /^TIT2: /.test(lines[i]))
+		else if (asciifilename && /^TIT2: /.test(lines[i]))
 		{
 			var j = 0;
 			var trackName = lines[i].substr(6);
 			// id3v2 doesn't output non-ASCII tracknames correctly - it masks out
-			// bit 8, resulting in ASCII-fied track names.
+			// bit 8, resulting in ASCII-fied track names, or outputs in Latin-1 (single-byte).
 			// Workaround: If the filename contains non-ASCII characters, 
 			// and the returned trackname is found in the ASCII-fied filename,
 			// then use the corresponding part of the (non-ASCII) filename as
 			// the track name.
-			var asciiFilename = '';
-			for (j = 0; j < filename.length; j++)
-			{
-				asciiFilename = asciiFilename + String.fromCharCode(filename.charCodeAt(j) & 0x7f);
-			}
-			if (asciiFilename != filename)
+			utf8filename = utf8Names[asciifilename];
+			console.log('lookup: utf8Names[' + asciifilename + '] = ' + utf8filename);
+			if (utf8filename && utf8filename != asciifilename)
 			{
 				// filename must contain non-ASCII characters..
-				var trackNameOffset = asciiFilename.indexOf(trackName);
+				var trackNameOffset = asciifilename.indexOf(trackName);
 				if (trackNameOffset >= 0)
 				{
-					trackName = filename.substr(trackNameOffset,trackName.length);
+					trackName = utf8filename.substr(trackNameOffset,trackName.length);
 				}
 			}
-			trackNames[filename] = trackName;
+			trackNames[utf8filename] = trackName;
 		}
 	}
 }
@@ -129,11 +128,40 @@ function displayPage(response)
 	
 } // displayPage
 
+function setUtf8Names(lsOutput)
+{
+	var lines = lsOutput.split('\n');
+	var filename = false;
+	utf8Names = [];
+	var i, j;
+	for (i = 0; i < lines.length; i++)
+	{
+		filename = path.basename(lines[i]);
+		var asciiFilename = '';
+		for (j = 0; j < filename.length; j++)
+		{
+			asciiFilename = asciiFilename + String.fromCharCode(filename.charCodeAt(j) & 0x7f);
+		}
+		utf8Names[asciiFilename] = filename;
+		console.log('utf8Names[' + asciiFilename + '] = ' + filename);
+	}
+}
+
 function getTracksAndDisplayPage(response)
+{
+	exec("ls -1 " + bashEscaped(musicpath) + "/*.mp3", { timeout : 2000 },
+		function(error, stdout, stderr) {
+			setUtf8Names(stdout);
+			getTrackNamesAndDisplay(response);
+		}
+	);
+}
+
+function getTrackNamesAndDisplay(response)
 {
 	// Get id3 tags and refresh page.
 	var cmd = "id3v2 -R " + bashEscaped(musicpath) + "/*.mp3";
-	exec(cmd, { timeout: 5000 },
+	exec(cmd, { encoding: 'ascii', timeout: 5000 },
 		function (error, stdout, stderr) {
 			// Get title tags for display
 			parseID3(stdout);
@@ -172,8 +200,9 @@ function libLink(pathname) {
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
+	  var filename = path.basename(pathname);
 	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(pathname)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
-				(trackNames[pathname] || pathname) + '</p>';
+				(trackNames[filename] || filename) + '</p>';
   }
   else return ""; 
 }
