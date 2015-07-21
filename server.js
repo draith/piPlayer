@@ -7,6 +7,7 @@ var pagetop = fs.readFileSync('pagetop.html');
 var pagebot = fs.readFileSync('pagebot.html');
 var index;
 var musicroot = "/home/pi/usbdrv/Music";
+var invalidUTF8char = String.fromCharCode(0xfffd);
 var musicpath = musicroot;
 var playingfile = false;
 var child_process = require('child_process');
@@ -58,26 +59,60 @@ function parseID3(id3Output)
 		else if (filename && /^TIT2: /.test(lines[i]))
 		{
 			var j = 0;
+			var nonAsciiChar = false;
 			var trackName = lines[i].substr(6);
-			// id3v2 doesn't output non-ASCII tracknames correctly - it masks out
-			// bit 8, resulting in ASCII-fied track names.
-			// Workaround: If the filename contains non-ASCII characters, 
-			// and the returned trackname is found in the ASCII-fied filename,
+			// Check trackName for non-ASCII characters..
+			for (j = 0; j < trackName.length; j++)
+			{
+				if (trackName.charCodeAt(j) & 0x80)
+				{
+					nonAsciiChar = trackName.charAt(j);
+					break;
+				}
+			}
+			// id3v2 doesn't always output non-ASCII tracknames as UTF8 - it masks out
+			// bit 8, resulting in ASCII-fied track names, or outputs in Latin-1.
+			// Workaround: If the trackname or filename contains non-ASCII characters, 
 			// then use the corresponding part of the (non-ASCII) filename as
 			// the track name.
-			var asciiFilename = '';
-			for (j = 0; j < filename.length; j++)
+			var trackNameOffset = -1;
+			if (nonAsciiChar == invalidUTF8char)
 			{
-				asciiFilename = asciiFilename + String.fromCharCode(filename.charCodeAt(j) & 0x7f);
-			}
-			if (asciiFilename != filename)
-			{
-				// filename must contain non-ASCII characters..
-				var trackNameOffset = asciiFilename.indexOf(trackName);
-				if (trackNameOffset >= 0)
+				// Search for match in filename, modulo invalid UTF8 in trackname.
+				for (trackNameOffset = filename.length - trackName.length; 
+					 trackNameOffset >= 0; trackNameOffset--)
 				{
-					trackName = filename.substr(trackNameOffset,trackName.length);
+					for (j = 0; j < trackName.length; j++)
+					{
+						if (trackName.charAt(j) != invalidUTF8char &&
+							trackName.charAt(j) != filename.charAt(trackNameOffset + j)) 
+						{
+							break; // Not a match
+						}
+					}
+					if (j == trackName.length) {
+						break; // Found a match at trackNameOffset.
+					}
 				}
+			}
+			else if (!nonAsciiChar)
+			{
+				// trackname is ASCII - see if it is an ASCII-fied version of part of
+				// a non-ASCII filename...
+				var asciiFilename = '';
+				for (j = 0; j < filename.length; j++)
+				{
+					asciiFilename = asciiFilename + String.fromCharCode(filename.charCodeAt(j) & 0x7f);
+				}
+				if (asciiFilename != filename)
+				{
+					// filename contains non-ASCII characters: look for trackName in asciiFilename
+					trackNameOffset = asciiFilename.indexOf(trackName);
+				}
+			}
+			if (trackNameOffset >= 0)
+			{
+				trackName = filename.substr(trackNameOffset,trackName.length);
 			}
 			trackNames[filename] = trackName;
 		}
