@@ -56,6 +56,27 @@ function playnext() {
 	}
 }
 
+// add paths of all mp3 files under dirpath to plist
+function addToPlist(dirpath)
+{
+	console.log('addToPlist: ' + dirpath);
+	var files = fs.readdirSync(dirpath);
+	var i;
+	for (i = 0; i < files.length; i++)
+	{
+		var filepath = path.join(dirpath,files[i]);
+		if (/\.mp3$/.test(files[i])) {
+			// add mp3 files to plist
+	console.log('addToPlist: filepath ' + filepath);
+			plist.push(filepath);
+		}
+		else if (fs.statSync(filepath).isDirectory()) {
+			// recursively add directory contents
+			addToPlist(filepath);
+		}
+	}
+}
+
 function updatePlist(dirpath) 
 {
 	console.log('updatePlist(' + dirpath + ')');
@@ -63,14 +84,8 @@ function updatePlist(dirpath)
 	if (dirpath != playDirPath)
 	{
 		playDirPath = dirpath;
-		var files = fs.readdirSync(dirpath);
 		plist = [];
-		for (i = 0; i < files.length; i++)
-		{
-			if (/\.mp3$/.test(files[i])) {
-				plist[i] = path.join(dirpath, files[i]);
-			}
-		}
+		addToPlist(dirpath);
 	}
 }
 
@@ -92,6 +107,23 @@ function playdir(dirpath)
 {
 	console.log("player: playdir(" + dirpath + ") called.");
 	updatePlist(dirpath);
+	nextIndex = 0;
+	stopAndPlayNext();
+}
+
+function playmix(dirpath) 
+{
+	console.log("player: playmix(" + dirpath + ") called.");
+	updatePlist(dirpath);
+	// Randomise plist...
+	var currentIndex = plist.length, swap, randomIndex;
+	while (currentIndex > 0) {
+		randomIndex = Math.floor(Math.random() * currentIndex);
+		currentIndex -= 1;
+		swap = plist[currentIndex];
+		plist[currentIndex] = plist[randomIndex];
+		plist[randomIndex] = swap;
+	}
 	nextIndex = 0;
 	stopAndPlayNext();
 }
@@ -121,6 +153,9 @@ process.on('message', function(message) {
 	switch (message.command) {
 	case 'playdir':
 		playdir(message.arg);
+		break;
+	case 'playmix':
+		playmix(message.arg);
 		break;
 	case 'play':
 		play(message.arg);

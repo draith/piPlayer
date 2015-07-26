@@ -102,6 +102,7 @@
 		if (playingTrackRow)
 		{
 			// Display current track plus preceding one.
+			playingTrackRow.className = "active playing";
 			scrolldiv.scrollTop = playingTrackRow.offsetTop - scrolldiv.offsetTop - playingTrackRow.offsetHeight;
 		}
 	}

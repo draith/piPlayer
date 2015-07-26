@@ -46,6 +46,7 @@ function parseID3(id3Output)
 {
 	var lines = id3Output.split('\n');
 	var filename = false;
+	var filepath = false;
 	trackNames = [];
 	var i;
 	for (i = 0; i < lines.length; i++)
@@ -53,10 +54,10 @@ function parseID3(id3Output)
 		// Get filename from Filename value.
 		if (/^Filename: /.test(lines[i]))
 		{
-			filename = lines[i].substr(10);
+			filepath = lines[i].substr(10);
 		}
 		// Get track name from TIT2 value.
-		else if (filename && /^TIT2: /.test(lines[i]))
+		else if (filepath && /^TIT2: /.test(lines[i]))
 		{
 			var j = 0;
 			var nonAsciiChar = false;
@@ -76,6 +77,7 @@ function parseID3(id3Output)
 			// then use the corresponding part of the (non-ASCII) filename as
 			// the track name.
 			var trackNameOffset = -1;
+			filename = path.basename(filepath,'.mp3');
 			if (nonAsciiChar == invalidUTF8char)
 			{
 				// Search for match in filename, modulo invalid UTF8 in trackname.
@@ -110,11 +112,12 @@ function parseID3(id3Output)
 					trackNameOffset = asciiFilename.indexOf(trackName);
 				}
 			}
+			
 			if (trackNameOffset >= 0)
 			{
 				trackName = filename.substr(trackNameOffset,trackName.length);
 			}
-			trackNames[filename] = trackName;
+			trackNames[filepath] = trackName;
 		}
 	}
 }
@@ -189,7 +192,9 @@ function libLink(pathname) {
   if (stat.isDirectory())
   {
 	  // Display directory name in hyperlink to 'cd' to that directory.
-	  var result = '<p>' + dirLink(pathname);
+	  var result = (playingfile && playingfile.indexOf(pathname) == 0 ?
+					'<p class="playing">' : '<p>')
+					+ dirLink(pathname);
 	  // Check for any mp3 files in the directory...
 	  var files = fs.readdirSync(pathname);
 	  for (j = 0; j < files.length; j++)
@@ -200,6 +205,7 @@ function libLink(pathname) {
 			break;
 		} 
 	  }
+	  result += '<span class="active" onclick="xmlrequest(\'./playmix?path=' + bashEscaped(encodeURIComponent(pathname)) + '\')">(Mix)</span>';
 	  result += '</p>';
 	  return result;
   }
@@ -236,10 +242,8 @@ function onRequest(request, response)
 	{
 	case 'pause':
 	case 'stop':
-		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
-		xmlResponse = response;
-		break;
 	case 'play':
+	case 'playmix':
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
 		xmlResponse = response;
 		break;
