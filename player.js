@@ -39,6 +39,7 @@ function playFile(filepath) {
 		omx.enableHangingHandler();
 		started = true;
 	}
+	console.log('Calling playFile(' + filepath + ')');
 	omx.play(filepath,{'-o': 'local', '--vol': '-300'});
 }
 
@@ -100,6 +101,52 @@ function stopAndPlayNext()
 	{
 		console.log('stopAndPlayNext calling playnext');
 		playnext();
+	}
+}
+
+function next()
+{
+	if (!omx.isPlaying())
+	{
+		process.send('end');
+	}
+	else if (nextIndex < plist.length)
+	{
+		stopAndPlayNext();
+	}
+	else 
+	{	// Stay on current (last) track
+		process.send('playing:' + plist[nextIndex-1]);
+	}
+}
+
+function start()
+{
+	if (!omx.isPlaying())
+	{
+		process.send('end');
+	}
+	else 
+	{	// Move nextIndex back one to start current track again.
+		nextIndex -= 1;
+		stopAndPlayNext();
+	}
+}
+
+function prev()
+{
+	if (!omx.isPlaying())
+	{
+		process.send('end');
+	}
+	else if (nextIndex > 1)
+	{	// Move nextIndex back 2 to start previous track.
+		nextIndex -= 2;
+		stopAndPlayNext();
+	}
+	else 
+	{	// Stay on current (last) track
+		process.send('playing:' + plist[nextIndex-1]);
 	}
 }
 
@@ -165,6 +212,15 @@ process.on('message', function(message) {
 		break;
 	case 'stop':
 		stop();
+		break;
+	case 'prev':
+		prev();
+		break;
+	case 'start':
+		start();
+		break;
+	case 'next':
+		next();
 		break;
 	}
 });

@@ -137,8 +137,11 @@ function displayPage(response)
 	}
 	response.write("<div id='top'>" +
 	"<a href='./'>Refresh</a>" +
+	'<span class="active" id="prev" onclick="xmlrequest(\'prev\')">&lt;&lt;</span>' +
+	'<span class="active" id="start" onclick="xmlrequest(\'start\')">&lt;</span>' +
 	'<span class="active" id="pause" onclick="xmlrequest(\'pause\')">Pause</span>' +
 	'<span class="active" id="stop" onclick="xmlrequest(\'stop\')">Stop</span>' +
+	'<span class="active" id="stop" onclick="xmlrequest(\'next\')">&gt;&gt;</span>' +
 	'<br/>');
 	response.write("<p>");
 	var linkPath = musicroot;
@@ -243,6 +246,9 @@ function onRequest(request, response)
 	case 'pause':
 	case 'stop':
 	case 'play':
+	case 'prev':
+	case 'next':
+	case 'start':
 	case 'playmix':
 		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
 		xmlResponse = response;
@@ -264,11 +270,12 @@ function onRequest(request, response)
 		// Refresh the page.
 		if (playingfile)
 		{	// Display currently-playing directory, if any..
-			musicpath = playingfile.substr(0,playingfile.lastIndexOf('/'));
+			musicpath = path.dirname(playingfile);
 		}
 		getTracksAndDisplayPage(response);
 		break;
 	default:
+		// Handle requests for files: return them if they exist.
 		var filename = path.join(process.cwd(), unescape(urlpath));
 		var stats;
 		var mimeType;
