@@ -217,7 +217,7 @@ function libLink(pathname) {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
 	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(pathname)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
-				(trackNames[pathname] || pathname) + '</p>';
+				(trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
   }
   else return ""; 
 }
