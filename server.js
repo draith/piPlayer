@@ -125,7 +125,7 @@ function parseID3(id3Output)
 function displayPage(response) 
 {
 	response.writeHead(200, {"Content-Type": "text/html"});
-	response.write(fs.readFileSync('pagetop.html'));
+	response.write(pagetop);
 	// Display directory links...
 	if (urlpath == 'cdplaydir') {
 		response.write('<body onload="xmlrequest(\'playdir\')">');
