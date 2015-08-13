@@ -141,7 +141,7 @@ function displayPage(response)
 	'<span class="active" id="start" onclick="xmlrequest(\'start\')">&lt;</span>' +
 	'<span class="active" id="pause" onclick="xmlrequest(\'pause\')">Pause</span>' +
 	'<span class="active" id="stop" onclick="xmlrequest(\'stop\')">Stop</span>' +
-	'<span class="active" id="stop" onclick="xmlrequest(\'next\')">&gt;&gt;</span>' +
+	'<span class="active" id="next" onclick="xmlrequest(\'next\')">&gt;&gt;</span>' +
 	'<br/>');
 	response.write("<p>");
 	var linkPath = musicroot;

@@ -13,7 +13,7 @@ function playFile(filepath) {
 		started = true;
 	}
 	console.log('Calling playFile(' + filepath + ')');
-	omx.play(filepath,{'-o': 'local', '--vol': '-300'});
+	omx.play(filepath,{'-o': 'local', '--vol': '-300', '--no_keys': ''});
 }
 
 function playnext() {
