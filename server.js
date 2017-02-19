@@ -13,6 +13,7 @@ var playingfile = false;
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
+var trackNumbers = [];
 var player = child_process.fork('./player');
 var xmlResponse;
 var urlpath;
@@ -48,6 +49,7 @@ function parseID3(id3Output)
 	var filename = false;
 	var filepath = false;
 	trackNames = [];
+  trackNumbers = [];
 	var i;
 	for (i = 0; i < lines.length; i++)
 	{
@@ -56,6 +58,11 @@ function parseID3(id3Output)
 		{
 			filepath = lines[i].substr(10);
 		}
+    // Get track number from TRCK: tag.
+    else if (/^TRCK: /.test(lines[i]))
+    {
+      trackNumbers[filepath] = lines[i].substr(6);
+    }
 		// Get track name from TIT2 value.
 		else if (filepath && /^TIT2: /.test(lines[i]))
 		{
@@ -120,7 +127,7 @@ function parseID3(id3Output)
 			trackNames[filepath] = trackName;
 		}
 	}
-}
+} // parseID3
 
 function displayPage(response) 
 {
@@ -203,10 +210,10 @@ function libLink(pathname) {
 	  for (j = 0; j < files.length; j++)
 	  {
 		  // If any, include a 'cdplaydir' link, to play all of them.
-		if (/\.mp3$/.test(files[j])) {
-			result += '<a href="./cdplaydir?path=' + encodeURIComponent(pathname) + '"> (Play)</a>';
-			break;
-		} 
+      if (/\.mp3$/.test(files[j])) {
+        result += '<a href="./cdplaydir?path=' + encodeURIComponent(pathname) + '"> (Play)</a>';
+        break;
+      } 
 	  }
 	  result += '<span class="active" onclick="xmlrequest(\'./playmix?path=' + bashEscaped(encodeURIComponent(pathname)) + '\')">(Mix)</span>';
 	  result += '</p>';
@@ -217,7 +224,7 @@ function libLink(pathname) {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
 	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(pathname)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
-				(trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
+				(typeof trackNumbers[pathname] != 'undefined' ? trackNumbers[pathname] + " - " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
   }
   else return ""; 
 }
