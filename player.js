@@ -151,7 +151,6 @@ var commandFunctions =
 	,
 	playdir: function(dirpath) 
 	{
-		//updatePlist(dirpath);
 		nextIndex = 0;
 		stopAndPlayNext();
 	}
@@ -175,7 +174,6 @@ var commandFunctions =
 	play: function(filepath) 
 	{
 		var filename = path.basename(filepath);
-		updatePlist(path.dirname(filepath));
 		// Set nextIndex to filename position in existing plist
 		nextIndex = 0;
 		for (i = 0; i < plist.length; i++)
