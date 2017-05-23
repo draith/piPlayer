@@ -151,7 +151,7 @@ var commandFunctions =
 	,
 	playdir: function(dirpath) 
 	{
-		updatePlist(dirpath);
+		//updatePlist(dirpath);
 		nextIndex = 0;
 		stopAndPlayNext();
 	}
@@ -187,6 +187,16 @@ var commandFunctions =
 		}
 		stopAndPlayNext();
 	}
+  ,
+  clearPlist: function(ignore)
+  {
+    plist = [];
+  }
+  ,
+  addToPlist: function(filepath)
+  {
+    plist.push(filepath);
+  }
 }; // commandFunctions
 
 // At the end of each track, play the next track in the playlist, if there is one.

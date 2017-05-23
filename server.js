@@ -14,6 +14,9 @@ var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
 var trackNumbers = [];
+var tracksByNumber = [];
+var playList = [];
+var uniqueTrackNumbers = 0;
 var player = child_process.fork('./player');
 var xmlResponse;
 var urlpath;
@@ -50,7 +53,10 @@ function parseID3(id3Output)
 	var filepath = false;
 	trackNames = [];
   trackNumbers = [];
+  tracksByNumber = [];
+  uniqueTrackNumbers = 0;
 	var i;
+  console.log("lines.length = " + lines.length);
 	for (i = 0; i < lines.length; i++)
 	{
 		// Get filename from Filename value.
@@ -61,7 +67,18 @@ function parseID3(id3Output)
     // Get track number from TRCK: tag.
     else if (/^TRCK: /.test(lines[i]))
     {
-      trackNumbers[filepath] = lines[i].substr(6);
+      var trackNum = parseInt(lines[i].substr(6));
+      trackNumbers[filepath] = trackNum;
+      if (trackNum > 0)
+      {
+        if (tracksByNumber[trackNum] == null)
+        {
+          tracksByNumber[trackNum] = filepath;
+          uniqueTrackNumbers += 1;
+          console.log("trackNum = " + trackNum);
+        }
+      }
+      else console.log("trackNum <= 0: " + trackNum);
     }
 		// Get track name from TIT2 value.
 		else if (filepath && /^TIT2: /.test(lines[i]))
@@ -167,9 +184,44 @@ function displayPage(response)
 	// Display contents of current directory in scrolling div.
 	response.write('</div>\n<div id=scrolling>');
 	var files = fs.readdirSync(musicpath);
+  var trackCount = 0;
 	for (i = 0; i < files.length; i++)
 	{
-		response.write(libLink(path.join(musicpath, files[i])));
+    var pathname = path.join(musicpath, files[i]);
+    var stat = fs.statSync(pathname);
+    if (stat.isDirectory())
+    {
+      response.write(libLinkDir(pathname));
+    }
+    else if (/\.mp3$/.test(pathname))
+    {
+      trackCount += 1;
+    }
+	}
+  
+  playList = [];
+  
+  // Sort tracks by number if each has a unique track number.
+  if (uniqueTrackNumbers == trackCount)
+  {
+    for (i = 1; i < tracksByNumber.length; i++)
+    {
+      if (tracksByNumber[i] != null) 
+      {
+        response.write(libLink(tracksByNumber[i]));
+        playList.push(tracksByNumber[i]);
+      }
+    }
+  }
+  else for (i = 0; i < files.length; i++)
+	{
+    var pathname = path.join(musicpath, files[i]);
+    var stat = fs.statSync(pathname);
+    if (!stat.isDirectory())
+    {
+      response.write(libLink(pathname));
+      playList.push(pathname);
+    }
 	}
 	response.write('</div>');
 	response.write(pagebot);
@@ -181,7 +233,7 @@ function getTracksAndDisplayPage(response)
 {
 	// Get id3 tags and refresh page.
 	var cmd = "id3v2 -R " + bashEscaped(musicpath) + "/*.mp3";
-	exec(cmd, { timeout: 5000 },
+	exec(cmd, { timeout: 10000 },
 		function (error, stdout, stderr) {
 			// Get title tags for display
 			parseID3(stdout);
@@ -196,35 +248,36 @@ function dirLink(pathname)
   return '<a href="./cd?path=' + encodeURIComponent(pathname) + '">' + path.basename(pathname) + '</a>';
 }
 
-// Display title and hyperlink(s) for one item in current directory.
-function libLink(pathname) {
-  var stat = fs.statSync(pathname);
-  if (stat.isDirectory())
+// Display title and hyperlink(s) for one directory in current directory.
+function libLinkDir(pathname) 
+{
+  // Display directory name in hyperlink to 'cd' to that directory.
+  var result = (playingfile && playingfile.indexOf(pathname) == 0 ?
+				'<p class="playing">' : '<p>')
+				+ dirLink(pathname);
+  // Check for any mp3 files in the directory...
+  var files = fs.readdirSync(pathname);
+  for (j = 0; j < files.length; j++)
   {
-	  // Display directory name in hyperlink to 'cd' to that directory.
-	  var result = (playingfile && playingfile.indexOf(pathname) == 0 ?
-					'<p class="playing">' : '<p>')
-					+ dirLink(pathname);
-	  // Check for any mp3 files in the directory...
-	  var files = fs.readdirSync(pathname);
-	  for (j = 0; j < files.length; j++)
-	  {
-		  // If any, include a 'cdplaydir' link, to play all of them.
-      if (/\.mp3$/.test(files[j])) {
-        result += '<a href="./cdplaydir?path=' + encodeURIComponent(pathname) + '"> (Play)</a>';
-        break;
-      } 
-	  }
-	  result += '<span class="active" onclick="xmlrequest(\'./playmix?path=' + bashEscaped(encodeURIComponent(pathname)) + '\')">(Mix)</span>';
-	  result += '</p>';
-	  return result;
+	  // If any, include a 'cdplaydir' link, to play all of them.
+     if (/\.mp3$/.test(files[j])) {
+       result += '<a href="./cdplaydir?path=' + encodeURIComponent(pathname) + '"> (Play)</a>';
+       break;
+     } 
   }
-  else if (/\.mp3$/.test(pathname))
+  result += '<span class="active" onclick="xmlrequest(\'./playmix?path=' + bashEscaped(encodeURIComponent(pathname)) + '\')">(Mix)</span>';
+  result += '</p>';
+  return result;
+}
+
+// Display title and hyperlink(s) for one mp3 file in current directory.
+function libLink(pathname) {
+  if (/\.mp3$/.test(pathname))
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
 	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(pathname)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
-				(typeof trackNumbers[pathname] != 'undefined' ? trackNumbers[pathname] + " - " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
+				(trackNumbers[pathname] > 0 ? trackNumbers[pathname] + " : " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
   }
   else return ""; 
 }
@@ -241,6 +294,15 @@ function quotEscaped(pathname)
   return pathname.replace(/"/g, "&quot;");
 }
 
+function sendPlist()
+{
+  player.send({command: 'clearPlist'});
+  for (i = 0; i < playList.length; i++)
+  {
+    player.send({command: 'addToPlist', arg: playList[i]});
+  }
+}
+
 // Request handler callback
 function onRequest(request, response) 
 {
@@ -250,9 +312,10 @@ function onRequest(request, response)
 	xmlResponse = false;
 	switch (urlpath)
 	{
+	case 'play':
+    sendPlist(); // and fall through...
 	case 'pause':
 	case 'stop':
-	case 'play':
 	case 'prev':
 	case 'next':
 	case 'start':
@@ -270,6 +333,7 @@ function onRequest(request, response)
 		getTracksAndDisplayPage(response);
 		break;
 	case 'playdir':
+    sendPlist();
 		player.send({command: urlpath, arg: musicpath});
 		xmlResponse = response;
 		break;
