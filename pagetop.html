@@ -76,12 +76,12 @@
 						if (elt)
 						{
 							elt.className = "active playing";
-							if (elt.offsetTop + elt.offsetHeight > scrolldiv.offsetTop + scrolldiv.scrollTop + scrolldiv.offsetHeight)
-							{
-								// scroll up to keep element in view, if needed
-								// Display current track plus preceding one.
-								scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
-							}
+//							if (elt.offsetTop + elt.offsetHeight > scrolldiv.offsetTop + scrolldiv.scrollTop + scrolldiv.offsetHeight)
+//							{
+//								// scroll up to keep element in view, if needed
+//								// Display current track plus preceding one.
+//								scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
+//							}
 						}
 						playingId = playId;
 						// Listen for end of track / next track.
