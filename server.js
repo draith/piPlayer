@@ -28,13 +28,16 @@ const wss = new WebSocket.Server({ port: 8080 });
 wss.on('connection', function connection(ws) {
   console.log('Connection open');
 
+  // Pass commands from browser through to player
   ws.on('message', function incoming(msg) {
       console.log('received: %s', msg);
       commandObj = JSON.parse(msg);
       switch (commandObj.command)
       {
-      case 'play':
-        sendPlist(); // and fall through...
+      case 'play': // commandObj.arg holds file path
+      case 'playdir':
+        // First, copy file play list to player
+        sendPlist(); 
       case 'pause':
       case 'stop':
       case 'prev':
@@ -42,10 +45,6 @@ wss.on('connection', function connection(ws) {
       case 'start':
       case 'playmix':
         // Pass command to player.
-        player.send(commandObj);
-        break;
-      case 'playdir':
-        sendPlist();
         player.send(commandObj);
         break;
       default:
@@ -78,14 +77,6 @@ player.on('message', function(message) {
 		}
 	}
   wss.broadcast(message);
- 	// if (xmlResponse)
- 	// {
- 		// console.log('Sending xml response.');
- 		// xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
- 		// xmlResponse.end(message);
- 		// // Ensure we don't respond twice.
- 		// xmlResponse = null;
- 	// }
 });
 
 // Populates trackNames as map from filename to track title,
