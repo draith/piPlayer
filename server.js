@@ -18,8 +18,51 @@ var tracksByNumber = [];
 var playList = [];
 var uniqueTrackNumbers = 0;
 var player = child_process.fork('./player');
-var xmlResponse;
+// var xmlResponse;
 var urlpath;
+
+const WebSocket = require('ws');
+
+const wss = new WebSocket.Server({ port: 8080 });
+
+wss.on('connection', function connection(ws) {
+  console.log('Connection open');
+
+  ws.on('message', function incoming(msg) {
+      console.log('received: %s', msg);
+      commandObj = JSON.parse(msg);
+      switch (commandObj.command)
+      {
+      case 'play':
+        sendPlist(); // and fall through...
+      case 'pause':
+      case 'stop':
+      case 'prev':
+      case 'next':
+      case 'start':
+      case 'playmix':
+        // Pass command to player.
+        player.send(commandObj);
+        break;
+      case 'playdir':
+        sendPlist();
+        player.send(commandObj);
+        break;
+      default:
+      console.log('Unknown command %', msg);
+      };
+  });
+});
+
+// Broadcast to all.
+wss.broadcast = function broadcast(data) {
+  console.log('broadcast: ' + data);
+  wss.clients.forEach(function each(client) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  });
+};
 
 // Pass messages from player back to client if it's waiting for an XMLresponse..
 player.on('message', function(message) {
@@ -34,14 +77,15 @@ player.on('message', function(message) {
 			playingfile = message.substr(message.indexOf(':') + 1);
 		}
 	}
-	if (xmlResponse)
-	{
-		console.log('Sending xml response.');
-		xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
-		xmlResponse.end(message);
-		// Ensure we don't respond twice.
-		xmlResponse = null;
-	}
+  wss.broadcast(message);
+ 	// if (xmlResponse)
+ 	// {
+ 		// console.log('Sending xml response.');
+ 		// xmlResponse.writeHead(200, {"Content-Type": "text/plain"});
+ 		// xmlResponse.end(message);
+ 		// // Ensure we don't respond twice.
+ 		// xmlResponse = null;
+ 	// }
 });
 
 // Populates trackNames as map from filename to track title,
@@ -152,7 +196,7 @@ function displayPage(response)
 	response.write(pagetop);
 	// Display directory links...
 	if (urlpath == 'cdplaydir') {
-		response.write('<body onload="xmlrequest(\'playdir\')">');
+		response.write('<body onload="sendCommand(\'playdir\')">');
 	} else if (playingfile) {
 		response.write('<body playing="' + quotEscaped(encodeURIComponent(playingfile)) +
 		'" onload="initPlaying()">');
@@ -161,11 +205,11 @@ function displayPage(response)
 	}
 	response.write("<div id='top'>" +
 	"<a href='./'>Refresh</a>" +
-	'<span class="active" id="prev" onclick="xmlrequest(\'prev\')">&lt;&lt;</span>' +
-	'<span class="active" id="start" onclick="xmlrequest(\'start\')">&lt;</span>' +
-	'<span class="active" id="pause" onclick="xmlrequest(\'pause\')">Pause</span>' +
-	'<span class="active" id="stop" onclick="xmlrequest(\'stop\')">Stop</span>' +
-	'<span class="active" id="next" onclick="xmlrequest(\'next\')">&gt;&gt;</span>' +
+	'<span class="active" id="prev" onclick="sendCommand(\'prev\')">&lt;&lt;</span>' +
+	'<span class="active" id="start" onclick="sendCommand(\'start\')">&lt;</span>' +
+	'<span class="active" id="pause" onclick="sendCommand(\'pause\')">Pause</span>' +
+	'<span class="active" id="stop" onclick="sendCommand(\'stop\')">Stop</span>' +
+	'<span class="active" id="next" onclick="sendCommand(\'next\')">&gt;&gt;</span>' +
 	'<br/>');
 	response.write("<p>");
 	var linkPath = musicroot;
@@ -265,7 +309,7 @@ function libLinkDir(pathname)
        break;
      } 
   }
-  result += '<span class="active" onclick="xmlrequest(\'./playmix?path=' + bashEscaped(encodeURIComponent(pathname)) + '\')">(Mix)</span>';
+  result += '<span class="active" onclick="sendCommand(\'playmix\', \'' + bashEscaped(pathname) + '\')">(Mix)</span>';
   result += '</p>';
   return result;
 }
@@ -276,7 +320,7 @@ function libLink(pathname) {
   {
 	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
 	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
-	  return '<p class="' + pclass + '" id="' + quotEscaped(encodeURIComponent(pathname)) + '" onclick="xmlrequest(\'./play?path=\' + this.id)">' + 
+	  return '<p class="' + pclass + '" id="' + quotEscaped(pathname) + '" onclick="sendCommand(\'play\', this.id)">' + 
 				(trackNumbers[pathname] > 0 ? trackNumbers[pathname] + " : " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
   }
   else return ""; 
@@ -312,30 +356,10 @@ function onRequest(request, response)
 	xmlResponse = false;
 	switch (urlpath)
 	{
-	case 'play':
-    sendPlist(); // and fall through...
-	case 'pause':
-	case 'stop':
-	case 'prev':
-	case 'next':
-	case 'start':
-	case 'playmix':
-		player.send({command: urlpath, arg: decodeURIComponent(requestURL.query.path)});
-		xmlResponse = response;
-		break;
-	case 'monitor':
-		// Request to pass back next signal from player.
-		xmlResponse = response;
-		break;
 	case 'cd':
 	case 'cdplaydir':
 		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
 		getTracksAndDisplayPage(response);
-		break;
-	case 'playdir':
-    sendPlist();
-		player.send({command: urlpath, arg: musicpath});
-		xmlResponse = response;
 		break;
 	case '':
 		// Refresh the page.
@@ -346,7 +370,7 @@ function onRequest(request, response)
 		getTracksAndDisplayPage(response);
 		break;
 	default:
-		// Handle requests for files: return them if they exist.
+		// Handle requests for files (e.g. icons): return them if they exist.
 		var filename = path.join(process.cwd(), unescape(urlpath));
 		var stats;
 		var mimeType;

@@ -18,8 +18,80 @@
 	var scrolldiv;
 	var topdiv;
 	var playingId = false;
-	
-	function resizeScroller()
+	var lastSync = 0;
+
+  var connection = new WebSocket('ws://' + window.location.hostname + ':8080');
+  
+  function sendCommand(cmd,arg) {
+    connection.send(JSON.stringify({ command: cmd, arg: arg }));
+  }
+ 
+  connection.onopen = function() {
+    // If this page was opened by clicking on a cdplaydir link, 
+    // issue the playdir command when the socked is open.
+    if (window.location.pathname == '/cdplaydir') {
+      sendCommand('playdir');
+    }
+  };
+  
+  connection.onerror = function(error) {
+    alert('WebSocket error: ' + error);
+  };
+  
+  connection.onmessage = function(msg) {
+    switch (msg.data)
+    {
+    case 'paused':
+    	document.getElementById('pause').innerHTML = 'Unpause';
+    	break;
+    case 'unpaused':
+    	document.getElementById('pause').innerHTML = 'Pause';
+    	break;
+		case 'stop':
+		case 'end':
+			// If the playing track was highlighted, unhighlight it.
+			elt = document.getElementById(playingId);
+			if (elt)
+			{
+				elt.className = "active";
+			}
+			playingId = false;
+			break;
+    default:
+			var splitResponse = msg.data.split(':');
+			if (splitResponse.length == 2 && splitResponse[0] == 'playing')
+			{
+				// Update highlighting of currently playing track.
+        var playId = splitResponse[1];
+				if ((playId != playingId) && playingId)
+				{
+					elt = document.getElementById(playingId);
+					if (elt)
+					{
+						elt.className = "active";
+					}
+				}
+				var elt = document.getElementById(playId);
+				if (elt)
+				{
+					elt.className = "active playing";
+//					if (elt.offsetTop + elt.offsetHeight > scrolldiv.offsetTop + scrolldiv.scrollTop + scrolldiv.offsetHeight)
+//					{
+//						// scroll up to keep element in view, if needed
+//						// Display current track plus preceding one.
+//						scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
+//					}
+				}
+				playingId = playId;
+			}
+			else
+			{
+				alert('responseText = ' + resp);
+			}
+    }
+  };
+ 
+  function resizeScroller()
 	{
 	   scrolldiv.style.height = window.innerHeight - topdiv.offsetHeight;
 	}
@@ -32,75 +104,10 @@
 	}
 	//window.onload = placeScroller;
 	//window.onresize = resizeScroller;
-	
-	function xmlrequest(command)
-	{
-		xmlhttp = new XMLHttpRequest();
-		xmlhttp.open("GET","./" + command, true);
-		xmlhttp.onreadystatechange = function() {
-			if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-				var resp = xmlhttp.responseText;
-				switch (resp)
-				{
-				case 'paused':
-					document.getElementById('pause').innerHTML = 'Unpause';
-					break;
-				case 'unpaused':
-					document.getElementById('pause').innerHTML = 'Pause';
-					break;
-				case 'stop':
-				case 'end':
-					// If the playing track was highlighted, unhighlight it.
-					elt = document.getElementById(playingId);
-					if (elt)
-					{
-						elt.className = "active";
-					}
-					playingId = false;
-					break;
-				default:
-					var splitResponse = resp.split(':');
-					if (splitResponse.length == 2 && splitResponse[0] == 'playing')
-					{
-						// Update highlighting of currently playing track.
-						var playId = encodeURIComponent(splitResponse[1]);
-						if ((playId != playingId) && playingId)
-						{
-							elt = document.getElementById(playingId);
-							if (elt)
-							{
-								elt.className = "active";
-							}
-						}
-						var elt = document.getElementById(playId);
-						if (elt)
-						{
-							elt.className = "active playing";
-//							if (elt.offsetTop + elt.offsetHeight > scrolldiv.offsetTop + scrolldiv.scrollTop + scrolldiv.offsetHeight)
-//							{
-//								// scroll up to keep element in view, if needed
-//								// Display current track plus preceding one.
-//								scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
-//							}
-						}
-						playingId = playId;
-						// Listen for end of track / next track.
-						xmlrequest('monitor');
-					}
-					else
-					{
-						alert('responseText = ' + resp);
-					}
-				}
-			}
-		};
-		xmlhttp.send();
-	} // xmlrequest
-	
+  	
 	function initPlaying()
 	{
 		playingId = document.getElementsByTagName("BODY")[0].getAttribute("playing");
-		xmlrequest("./monitor");
 		var playingTrackRow = document.getElementById(playingId);
 		if (playingTrackRow)
 		{
