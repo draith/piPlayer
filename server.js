@@ -18,7 +18,6 @@ var tracksByNumber = [];
 var playList = [];
 var uniqueTrackNumbers = 0;
 var player = child_process.fork('./player');
-// var xmlResponse;
 var urlpath;
 
 const WebSocket = require('ws');
@@ -189,7 +188,7 @@ function displayPage(response)
 	if (urlpath == 'cdplaydir') {
 		response.write('<body onload="sendCommand(\'playdir\')">');
 	} else if (playingfile) {
-		response.write('<body playing="' + quotEscaped(encodeURIComponent(playingfile)) +
+		response.write('<body playing="' + quotEscaped(playingfile) +
 		'" onload="initPlaying()">');
 	} else {
 		response.write('<body>');
