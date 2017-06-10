@@ -10,6 +10,8 @@ var musicroot = "/home/pi/usbdrv/Music";
 var invalidUTF8char = String.fromCharCode(0xfffd);
 var musicpath = musicroot;
 var playingfile = false;
+var searchroot;
+var searchstring;
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
@@ -90,7 +92,6 @@ function parseID3(id3Output)
   tracksByNumber = [];
   uniqueTrackNumbers = 0;
 	var i;
-  console.log("lines.length = " + lines.length);
 	for (i = 0; i < lines.length; i++)
 	{
 		// Get filename from Filename value.
@@ -109,10 +110,8 @@ function parseID3(id3Output)
         {
           tracksByNumber[trackNum] = filepath;
           uniqueTrackNumbers += 1;
-          console.log("trackNum = " + trackNum);
         }
       }
-      else console.log("trackNum <= 0: " + trackNum);
     }
 		// Get track name from TIT2 value.
 		else if (filepath && /^TIT2: /.test(lines[i]))
@@ -180,7 +179,7 @@ function parseID3(id3Output)
 	}
 } // parseID3
 
-function displayPage(response) 
+function startPage(response)
 {
 	response.writeHead(200, {"Content-Type": "text/html"});
 	response.write(pagetop);
@@ -215,9 +214,22 @@ function displayPage(response)
 	}
 	// Write title of current directory
 	response.write('</p><p class="title">' + path.basename(musicpath) + '</p>');
-	// Display contents of current directory in scrolling div.
 	response.write('</div>\n<div id=scrolling>');
+}
+
+function endPage(response) 
+{
+	response.write('</div>');
+	response.write(pagebot);
+	response.end();
+}
+
+function displayDirPage(response) 
+{
+  startPage(response);
+	// Display contents of current directory in scrolling div.
 	var files = fs.readdirSync(musicpath);
+  var addedSearch = false;
   var trackCount = 0;
 	for (i = 0; i < files.length; i++)
 	{
@@ -225,6 +237,10 @@ function displayPage(response)
     var stat = fs.statSync(pathname);
     if (stat.isDirectory())
     {
+      if (!addedSearch) {
+        response.write(searchField(musicpath));
+        addedSearch = true;
+      }
       response.write(libLinkDir(pathname));
     }
     else if (/\.mp3$/.test(pathname))
@@ -257,11 +273,9 @@ function displayPage(response)
       playList.push(pathname);
     }
 	}
-	response.write('</div>');
-	response.write(pagebot);
-	response.end();
-	
-} // displayPage
+	endPage(response);
+  
+} // displayDirPage
 
 function getTracksAndDisplayPage(response)
 {
@@ -271,9 +285,46 @@ function getTracksAndDisplayPage(response)
 		function (error, stdout, stderr) {
 			// Get title tags for display
 			parseID3(stdout);
-			displayPage(response);
+			displayDirPage(response);
 		}
 	);
+}
+
+function displaySearchResults(response)
+{
+	// Get search result and refresh page.
+	var cmd = "find " + bashEscaped(searchroot) + ' -iname *' + searchstring.replace(/\s/g, '*') + '*';
+  console.log('exec command: ' + cmd);
+	exec(cmd, { timeout: 3000 },
+		function (error, stdout, stderr) {
+      // Display search results
+      startPage(response);
+      var paths = stdout.split('\n');
+      console.log('found ' + paths.length + ' matches');
+      if (paths.length > 1) { // Ignore empty last entry
+        playList = [];
+      }
+			for (i = 0; i < paths.length - 1; i++)
+      {
+        console.log('match: ' + paths[i]);
+        if (/\.mp3$/.test(paths[i]))
+        {
+          // MP3 file: display filename in 'play' hyperlink.
+          response.write('<p class="active" id="' + quotEscaped(paths[i]) + 
+                         '" onclick="sendCommand(\'play\', this.id)">' + 
+                         path.basename(paths[i],'.mp3') + '</p>');
+          // Add to playlist
+          playList.push(paths[i]);
+        }
+        else
+        {
+          response.write(dirLink(paths[i]));
+        }
+      }
+      endPage(response);
+		}
+	);
+  
 }
 
 function dirLink(pathname)
@@ -281,6 +332,17 @@ function dirLink(pathname)
   // Display directory name in hyperlink to 'cd' to that directory.
   return '<a href="./cd?path=' + encodeURIComponent(pathname) + '">' + path.basename(pathname) + '</a>';
 }
+
+function searchField(pathname)
+{
+  // Display directory name in hyperlink to 'cd' to that directory.
+  return '<form action="./search">' +
+         '<input type="hidden" name="path" value="' + pathname + '">' +
+         '<input type="text" name="searchString">' +
+         '<input type="submit" value="Search">' +
+         '</form>';
+}
+
 
 // Display title and hyperlink(s) for one directory in current directory.
 function libLinkDir(pathname) 
@@ -351,6 +413,13 @@ function onRequest(request, response)
 		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
 		getTracksAndDisplayPage(response);
 		break;
+  case 'search':
+    searchroot = fs.realpathSync(decodeURIComponent(requestURL.query.path));
+    searchstring = decodeURIComponent(requestURL.query.searchString);
+    console.log('root = ' + searchroot);
+    console.log('string = ' + searchstring);
+    displaySearchResults(response);
+    break;
 	case '':
 		// Refresh the page.
 		if (playingfile)
