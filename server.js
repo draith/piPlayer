@@ -11,7 +11,7 @@ var invalidUTF8char = String.fromCharCode(0xfffd);
 var musicpath = musicroot;
 var playingfile = false;
 var searchroot;
-var searchstring;
+var searchstring = '';
 var child_process = require('child_process');
 var exec = child_process.exec;
 var trackNames = [];
@@ -299,6 +299,7 @@ function displaySearchResults(response)
 		function (error, stdout, stderr) {
       // Display search results
       startPage(response);
+      response.write(searchField(musicpath));
       var paths = stdout.split('\n');
       console.log('found ' + paths.length + ' matches');
       if (paths.length > 1) { // Ignore empty last entry
@@ -338,7 +339,7 @@ function searchField(pathname)
   // Display directory name in hyperlink to 'cd' to that directory.
   return '<form action="./search">' +
          '<input type="hidden" name="path" value="' + pathname + '">' +
-         '<input type="text" name="searchString">' +
+         '<input type="text" name="searchString" value="' + searchstring + '">' +
          '<input type="submit" value="Search">' +
          '</form>';
 }
