@@ -13,7 +13,10 @@
     body { margin:0; padding:0; background-color: #cc9; }
 		div#top { background-color: #bdd; border-bottom: solid #bdd }
 		p.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
-	</style>
+    .transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
+    .left { left: 0; width: 100%; }
+    .right { right: 0 }
+   </style>
 	<script>
 	var scrolldiv;
 	var topdiv;
@@ -26,6 +29,10 @@
     connection.send(JSON.stringify({ command: cmd, arg: arg }));
   }
  
+  function filenameBase(path) {
+    return path.substring(path.lastIndexOf("/")+1, path.lastIndexOf("."));
+  }
+  
   connection.onopen = function() {
     // If this page was opened by clicking on a cdplaydir link, 
     // issue the playdir command when the socked is open.
@@ -56,6 +63,9 @@
 				elt.className = "active";
 			}
 			playingId = false;
+      // Hide transport control bar
+      document.getElementById("tleft").style.visibility = 'hidden';
+      document.getElementById("tright").style.visibility = 'hidden';
 			break;
     default:
 			var splitResponse = msg.data.split(':');
@@ -82,6 +92,10 @@
 //						scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
 //					}
 				}
+        // Display track in transport control div..
+        document.getElementById("tleft").style.visibility = 'visible';
+        document.getElementById("tright").style.visibility = 'visible';
+        document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
 				playingId = playId;
 			}
 			else
@@ -115,6 +129,11 @@
 			playingTrackRow.className = "active playing";
 			// scrolldiv.scrollTop = playingTrackRow.offsetTop - scrolldiv.offsetTop - playingTrackRow.offsetHeight;
 		}
+    var transportVisibility = (playingId ? 'visible' : 'hidden');
+    document.getElementById("tleft").style.visibility = transportVisibility;
+    document.getElementById("tright").style.visibility = transportVisibility;
+    document.getElementById('currentTitle').innerHTML = 
+      (playingTrackRow ? playingTrackRow.innerHTML : filenameBase(playingId));
 	}
 	</script>
 <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
@@ -136,4 +155,3 @@
 <meta name="msapplication-TileImage" content="/mstile-144x144.png">
 <meta name="theme-color" content="#ffffff">
 </head>
-
