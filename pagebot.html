@@ -1,12 +1,16 @@
-<div id="tleft" class="transport left">
-	<span class="active" id="prev" onclick="sendCommand('prev')">&lt;&lt;</span>
-	<span class="active" id="start" onclick="sendCommand('start')">&lt;</span>
-  <a href="./" class="playing" id="currentTitle">[ Current Track ]</a>
-</div>
-<div id="tright" class="transport right">
-	<span class="active" id="pause" onclick="sendCommand('pause')">Pause</span>
-	<span class="active" id="stop" onclick="sendCommand('stop')">Stop</span>
-	<span class="active" id="next" onclick="sendCommand('next')">&gt;&gt;</span>
+<div id="transport" class="left">
+  <marquee class="playing active left" id="currentTitle" 
+  behavior="scroll" direction="left" scrollamount="10"
+  onclick="window.location.replace('./')">[ Current Track ]</marquee>
+  <span class="left">
+    <span class="active" id="prev" onclick="sendCommand('prev')">&lt;&lt;</span>
+    <span class="active" id="start" onclick="sendCommand('start')">&lt;</span>
+  </span>
+  <span class="right">
+    <span class="active" id="pause" onclick="sendCommand('pause')">Pause</span>
+    <span class="active" id="stop" onclick="sendCommand('stop')">Stop</span>
+    <span class="active" id="next" onclick="sendCommand('next')">&gt;&gt;</span>
+  </span>
 </div>
 </body>
 </html>

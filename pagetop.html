@@ -13,9 +13,9 @@
     body { margin:0; padding:0; background-color: #cc9; }
 		div#top { background-color: #bdd; border-bottom: solid #bdd }
 		p.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
-    .transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
+    #transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
     .left { left: 0; width: 100%; }
-    .right { right: 0 }
+    .right { position: fixed; bottom: 0; right: 0 }
    </style>
 	<script>
 	var scrolldiv;
@@ -64,8 +64,7 @@
 			}
 			playingId = false;
       // Hide transport control bar
-      document.getElementById("tleft").style.visibility = 'hidden';
-      document.getElementById("tright").style.visibility = 'hidden';
+      document.getElementById("transport").style.visibility = 'hidden';
 			break;
     default:
 			var splitResponse = msg.data.split(':');
@@ -85,16 +84,9 @@
 				if (elt)
 				{
 					elt.className = "active playing";
-//					if (elt.offsetTop + elt.offsetHeight > scrolldiv.offsetTop + scrolldiv.scrollTop + scrolldiv.offsetHeight)
-//					{
-//						// scroll up to keep element in view, if needed
-//						// Display current track plus preceding one.
-//						scrolldiv.scrollTop = elt.offsetTop - scrolldiv.offsetTop - elt.offsetHeight;
-//					}
 				}
         // Display track in transport control div..
-        document.getElementById("tleft").style.visibility = 'visible';
-        document.getElementById("tright").style.visibility = 'visible';
+        document.getElementById("transport").style.visibility = 'visible';
         document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
 				playingId = playId;
 			}
@@ -114,10 +106,7 @@
 	   topdiv = document.getElementById('top');
 	   scrolldiv = document.getElementById('scrolling');
 	   scrolldiv.style.top = topdiv.offsetHeight + 1;
-	   // resizeScroller();
 	}
-	//window.onload = placeScroller;
-	//window.onresize = resizeScroller;
   	
 	function initPlaying()
 	{
@@ -127,11 +116,9 @@
 		{
 			// Display current track plus preceding one.
 			playingTrackRow.className = "active playing";
-			// scrolldiv.scrollTop = playingTrackRow.offsetTop - scrolldiv.offsetTop - playingTrackRow.offsetHeight;
 		}
-    var transportVisibility = (playingId ? 'visible' : 'hidden');
-    document.getElementById("tleft").style.visibility = transportVisibility;
-    document.getElementById("tright").style.visibility = transportVisibility;
+    document.getElementById("transport").style.visibility = 
+      (playingId ? 'visible' : 'hidden');
     document.getElementById('currentTitle').innerHTML = 
       (playingTrackRow ? playingTrackRow.innerHTML : filenameBase(playingId));
 	}

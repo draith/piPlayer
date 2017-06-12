@@ -192,14 +192,7 @@ function startPage(response)
 	} else {
 		response.write('<body>');
 	}
-	response.write("<div id='top'>"); // +
-	// "<a href='./'>Refresh</a>" +
-	// '<span class="active" id="prev" onclick="sendCommand(\'prev\')">&lt;&lt;</span>' +
-	// '<span class="active" id="start" onclick="sendCommand(\'start\')">&lt;</span>' +
-	// '<span class="active" id="pause" onclick="sendCommand(\'pause\')">Pause</span>' +
-	// '<span class="active" id="stop" onclick="sendCommand(\'stop\')">Stop</span>' +
-	// '<span class="active" id="next" onclick="sendCommand(\'next\')">&gt;&gt;</span>' +
-	// '<br/>');
+	response.write("<div id='top'>");
 	response.write("<p>");
 	var linkPath = musicroot;
 	var diffPath = path.relative(musicroot, musicpath).split('/');
@@ -219,7 +212,8 @@ function startPage(response)
 
 function endPage(response) 
 {
-	response.write('<br/></div>');
+  // Blank lines to scroll under the track control.
+	response.write('<br/><br/></div>');
 	response.write(pagebot);
 	response.end();
 }
