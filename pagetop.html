@@ -22,8 +22,15 @@
 	var topdiv;
 	var playingId = false;
 	var lastSync = 0;
+  var ticker = false;
+  var progressSecs = 0;
 
   var connection = new WebSocket('ws://' + window.location.hostname + ':8080');
+  
+  function incProgress() {
+    progressSecs += 1;
+    document.getElementById('progress').innerHTML = progressSecs.toString();
+  }
   
   function sendCommand(cmd,arg) {
     connection.send(JSON.stringify({ command: cmd, arg: arg }));
@@ -50,9 +57,12 @@
     {
     case 'paused':
     	document.getElementById('pause').innerHTML = 'Unpause';
+      clearTimeout(ticker);
+      ticker = false;
     	break;
     case 'unpaused':
     	document.getElementById('pause').innerHTML = 'Pause';
+      ticker = setInterval(incProgress, 1000);
     	break;
 		case 'stop':
 		case 'end':
@@ -65,6 +75,8 @@
 			playingId = false;
       // Hide transport control bar
       document.getElementById("transport").style.visibility = 'hidden';
+      clearTimeout(ticker);
+      ticker = false;
 			break;
     default:
 			var splitResponse = msg.data.split(':');
@@ -90,6 +102,16 @@
         document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
 				playingId = playId;
 			}
+      else if (splitResponse.length == 3 && splitResponse[0] == 'played')
+      {
+        progressSecs = parseInt(splitResponse[1]);
+        if (!ticker)
+        {
+          ticker = setInterval(incProgress, 1000);
+        }
+        document.getElementById('progress').innerHTML = splitResponse[1];
+        document.getElementById('duration').innerHTML = splitResponse[2];
+      }
 			else
 			{
 				alert('responseText = ' + resp);

@@ -3,6 +3,7 @@ var url = require("url");
 var fs = require("fs");
 var path = require("path");
 var mimetypes = require("mime-types");
+var mp3Duration = require("mp3-duration");
 var pagetop = fs.readFileSync('pagetop.html');
 var pagebot = fs.readFileSync('pagebot.html');
 var index;
@@ -10,6 +11,9 @@ var musicroot = "/home/pi/usbdrv/Music";
 var invalidUTF8char = String.fromCharCode(0xfffd);
 var musicpath = musicroot;
 var playingfile = false;
+var dateObj = new Date;
+var startTime = false;
+var pauseTime = false;
 var searchroot;
 var searchstring = '';
 var child_process = require('child_process');
@@ -64,7 +68,7 @@ wss.broadcast = function broadcast(data) {
   });
 };
 
-// Pass messages from player back to client if it's waiting for an XMLresponse..
+// Pass messages from player back to clients
 player.on('message', function(message) {
 	console.log('Received from child: ' + message);
 	// Keep track of currently playing filename.
@@ -75,6 +79,15 @@ player.on('message', function(message) {
 		if (splitResponse.length > 1 && splitResponse[0] == 'playing')
 		{
 			playingfile = message.substr(message.indexOf(':') + 1);
+      startTime = Date.now();
+      console.log('startTime = ' + startTime.toString());
+      mp3Duration(playingfile, function(err, duration) {
+        if (err) return console.log(err.message);
+        console.log('file ' + playingfile + ' duration is ' + duration);
+        startTime = Math.floor((Date.now() - startTime) / 1000);
+        console.log('played ' + startTime.toString());
+        wss.broadcast('played:' + startTime.toString() + ':' + Math.floor(duration).toString());
+      });
 		}
 	}
   wss.broadcast(message);
