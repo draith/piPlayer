@@ -24,14 +24,41 @@
 	var lastSync = 0;
   var ticker = false;
   var progressSecs = 0;
+  var lastTick = 0;
+  var msSinceTick = 0;
 
   var connection = new WebSocket('ws://' + window.location.hostname + ':8080');
   
   function incProgress() {
     progressSecs += 1;
+    lastTick = Date.now();
     document.getElementById('progress').innerHTML = progressSecs.toString();
   }
   
+  function startTicker() {
+    if (ticker) stopTicker();
+    progressSecs = 0;
+    ticker = setInterval(incProgress, 1000);
+  }
+  
+  function stopTicker() {
+    clearTimeout(ticker);
+    ticker = false;
+  }  
+
+  function pauseTicker() {
+    msSinceTick = Date.now() - lastTick;
+    stopTicker();
+  }
+  
+  function unpauseTicker() {
+    setTimeout(function() {
+      incProgress();
+      ticker = setInterval(incProgress, 1000);
+    },
+    1000 - msSinceTick);
+  }
+
   function sendCommand(cmd,arg) {
     connection.send(JSON.stringify({ command: cmd, arg: arg }));
   }
@@ -57,12 +84,11 @@
     {
     case 'paused':
     	document.getElementById('pause').innerHTML = 'Unpause';
-      clearTimeout(ticker);
-      ticker = false;
+      pauseTicker();
     	break;
     case 'unpaused':
     	document.getElementById('pause').innerHTML = 'Pause';
-      ticker = setInterval(incProgress, 1000);
+      unpauseTicker();
     	break;
 		case 'stop':
 		case 'end':
@@ -75,8 +101,7 @@
 			playingId = false;
       // Hide transport control bar
       document.getElementById("transport").style.visibility = 'hidden';
-      clearTimeout(ticker);
-      ticker = false;
+      stopTicker();
 			break;
     default:
 			var splitResponse = msg.data.split(':');
@@ -104,12 +129,6 @@
 			}
       else if (splitResponse.length == 3 && splitResponse[0] == 'played')
       {
-        progressSecs = parseInt(splitResponse[1]);
-        if (!ticker)
-        {
-          ticker = setInterval(incProgress, 1000);
-        }
-        document.getElementById('progress').innerHTML = splitResponse[1];
         document.getElementById('duration').innerHTML = splitResponse[2];
       }
 			else

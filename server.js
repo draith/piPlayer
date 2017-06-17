@@ -11,6 +11,7 @@ var musicroot = "/home/pi/usbdrv/Music";
 var invalidUTF8char = String.fromCharCode(0xfffd);
 var musicpath = musicroot;
 var playingfile = false;
+var durationfile = false;
 var dateObj = new Date;
 var startTime = false;
 var pauseTime = false;
@@ -68,6 +69,31 @@ wss.broadcast = function broadcast(data) {
   });
 };
 
+function getDuration()
+{
+  startTime = Date.now();
+  console.log('startTime = ' + startTime.toString());
+  // Re-entrancy guard.
+  if (durationfile) return;
+  durationfile = playingfile;
+  mp3Duration(playingfile, function(err, duration) {
+    if (err) return console.log(err.message);
+    console.log('file ' + playingfile + ' duration is ' + duration);
+    startTime = Math.floor((Date.now() - startTime) / 1000);
+    console.log('played ' + startTime.toString());
+    if (durationfile == playingfile) {
+      wss.broadcast('played:' + startTime.toString() + ':' + Math.floor(duration).toString());
+      durationfile = false;
+    }
+    else {
+      durationfile = false;
+      if (playingfile) {
+        getDuration();
+      }
+    }
+  });
+}
+
 // Pass messages from player back to clients
 player.on('message', function(message) {
 	console.log('Received from child: ' + message);
@@ -79,15 +105,7 @@ player.on('message', function(message) {
 		if (splitResponse.length > 1 && splitResponse[0] == 'playing')
 		{
 			playingfile = message.substr(message.indexOf(':') + 1);
-      startTime = Date.now();
-      console.log('startTime = ' + startTime.toString());
-      mp3Duration(playingfile, function(err, duration) {
-        if (err) return console.log(err.message);
-        console.log('file ' + playingfile + ' duration is ' + duration);
-        startTime = Math.floor((Date.now() - startTime) / 1000);
-        console.log('played ' + startTime.toString());
-        wss.broadcast('played:' + startTime.toString() + ':' + Math.floor(duration).toString());
-      });
+      getDuration();
 		}
 	}
   wss.broadcast(message);
