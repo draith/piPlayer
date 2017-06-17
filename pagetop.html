@@ -14,17 +14,69 @@
 		div#top { background-color: #bdd; border-bottom: solid #bdd }
 		p.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
     #transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
+    #bar { bottom: 0; left: 0; background-color: green; width: 0% }
+    #progress { position: absolute; left: 40% }
     .left { left: 0; width: 100%; }
-    .right { position: fixed; bottom: 0; right: 0 }
+    .right { position: absolute; right: 0 }
    </style>
 	<script>
 	var scrolldiv;
 	var topdiv;
 	var playingId = false;
 	var lastSync = 0;
+  var ticker = false;
+  var progressSecs = 0;
+  var lastTick = 0;
+  var msSinceTick = 0;
+  var currentDuration = 0;
 
   var connection = new WebSocket('ws://' + window.location.hostname + ':8181');
   
+  function incProgress() {
+    lastTick = Date.now();
+    progressSecs += 1;
+    var secs = progressSecs % 60;
+    document.getElementById('progress').innerHTML = 
+      Math.floor(progressSecs/60).toString() + 
+      (secs < 10 ? ':0' : ':') + secs.toString();
+    if (currentDuration > 0) {
+      document.getElementById('bar').style.width = 
+        (progressSecs * 100 / currentDuration).toString() + '%';
+    }
+    else {
+      document.getElementById('bar').style.width = "0%";
+    }
+  }
+  
+  function stopTicker() {
+    clearTimeout(ticker);
+    ticker = false;
+  }  
+
+  function startTicker() {
+    if (ticker) stopTicker();
+    progressSecs = -1;  // Will be set to 0 and displayed by incProgress...
+    currentDuration = 0;
+    incProgress();
+    ticker = setInterval(incProgress, 1000);
+    // document.getElementById('duration').innerHTML = '...';
+  }
+  
+  function pauseTicker() {
+    msSinceTick = Date.now() - lastTick;
+    stopTicker();
+  }
+  
+  function unpauseTicker() {
+    // Increment progressSecs after 1000-msSinceTick
+    // and then every second.
+    setTimeout(function() {
+      incProgress();
+      ticker = setInterval(incProgress, 1000);
+    },
+    1000 - msSinceTick);
+  }
+
   function sendCommand(cmd,arg) {
     connection.send(JSON.stringify({ command: cmd, arg: arg }));
   }
@@ -35,7 +87,7 @@
   
   connection.onopen = function() {
     // If this page was opened by clicking on a cdplaydir link, 
-    // issue the playdir command when the socked is open.
+    // issue the playdir command when the socket is open.
     if (window.location.pathname == '/cdplaydir') {
       sendCommand('playdir');
     }
@@ -50,9 +102,11 @@
     {
     case 'paused':
     	document.getElementById('pause').innerHTML = 'Unpause';
+      pauseTicker();
     	break;
     case 'unpaused':
     	document.getElementById('pause').innerHTML = 'Pause';
+      unpauseTicker();
     	break;
 		case 'stop':
 		case 'end':
@@ -65,6 +119,7 @@
 			playingId = false;
       // Hide transport control bar
       document.getElementById("transport").style.visibility = 'hidden';
+      stopTicker();
 			break;
     default:
 			var splitResponse = msg.data.split(':');
@@ -89,7 +144,13 @@
         document.getElementById("transport").style.visibility = 'visible';
         document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
 				playingId = playId;
+        startTicker();
 			}
+      else if (splitResponse.length == 3 && splitResponse[0] == 'played')
+      {
+        currentDuration = parseInt(splitResponse[2]);
+        //document.getElementById('duration').innerHTML = splitResponse[2];
+      }
 			else
 			{
 				alert('responseText = ' + resp);

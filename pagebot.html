@@ -5,12 +5,15 @@
   <span class="left">
     <span class="active" id="prev" onclick="sendCommand('prev')">&lt;&lt;</span>
     <span class="active" id="start" onclick="sendCommand('start')">&lt;</span>
+    <span id="progress" class="playing"></span>
+    <!-- / <span id="duration"></span> -->
   </span>
   <span class="right">
     <span class="active" id="pause" onclick="sendCommand('pause')">Pause</span>
     <span class="active" id="stop" onclick="sendCommand('stop')">Stop</span>
     <span class="active" id="next" onclick="sendCommand('next')">&gt;&gt;</span>
   </span>
+  <div id="bar"/>
 </div>
 </body>
 </html>
