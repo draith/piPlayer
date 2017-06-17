@@ -23,7 +23,7 @@
 	var playingId = false;
 	var lastSync = 0;
 
-  var connection = new WebSocket('ws://' + window.location.hostname + ':8080');
+  var connection = new WebSocket('ws://' + window.location.hostname + ':8181');
   
   function sendCommand(cmd,arg) {
     connection.send(JSON.stringify({ command: cmd, arg: arg }));
