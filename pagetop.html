@@ -12,7 +12,7 @@
 	  html, body { overflow: auto; height: 100% }
     body { margin:0; padding:0; background-color: #cc9; }
 		div#top { background-color: #bdd; border-bottom: solid #bdd }
-		p.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
+		.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
     #transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
     #bar { bottom: 0; left: 0; background-color: green; width: 0% }
     #progress { position: absolute; left: 40% }
@@ -101,7 +101,7 @@
     switch (msg.data)
     {
     case 'paused':
-    	document.getElementById('pause').innerHTML = 'Unpause';
+    	document.getElementById('pause').innerHTML = 'Play';
       pauseTicker();
     	break;
     case 'unpaused':
