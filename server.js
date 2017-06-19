@@ -210,7 +210,7 @@ function parseID3(id3Output)
 	}
 } // parseID3
 
-function startPage(response)
+function startPage(response, searchResults)
 {
 	response.writeHead(200, {"Content-Type": "text/html"});
 	response.write(pagetop);
@@ -237,7 +237,13 @@ function startPage(response)
 		}
 	}
 	// Write title of current directory
-	response.write('</p><p class="title">' + path.basename(musicpath) + '</p>');
+  if (searchResults) {
+    response.write('</p>' + dirLink(linkPath));
+  }
+  else
+  {
+    response.write('</p><p class="title">' + path.basename(musicpath) + '</p>');
+  }
 	response.write('</div>\n<div id=scrolling>');
 }
 
@@ -323,7 +329,7 @@ function displaySearchResults(response)
 	exec(cmd, { timeout: 3000 },
 		function (error, stdout, stderr) {
       // Display search results
-      startPage(response);
+      startPage(response, true);
       response.write(searchField(musicpath));
       var paths = stdout.split('\n');
       console.log('found ' + paths.length + ' matches');
@@ -344,7 +350,7 @@ function displaySearchResults(response)
         }
         else
         {
-          response.write(dirLink(paths[i]));
+          response.write('<p>' + dirLink(paths[i]) + '</p>');
         }
       }
       endPage(response);
