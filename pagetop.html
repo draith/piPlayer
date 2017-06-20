@@ -1,36 +1,36 @@
 <html>
 <head>
-	<title>piPlayer</title>
-	<meta charset="UTF-8">
-	<style>
-		a,p,span,div,form,input { font-size: 60px; font-family: sans-serif; margin: 0px; padding: 10px; }
-		.active { cursor: pointer; color: rgb(85,26,139); text-decoration: underline }
-		/* div#scrolling { overflow: scroll;  background-color: #cc9; 
+  <title>piPlayer</title>
+  <meta charset="UTF-8">
+  <style>
+    a,p,span,div,form,input { font-size: 60px; font-family: sans-serif; margin: 0px; padding: 10px; }
+    .active { cursor: pointer; color: rgb(85,26,139); text-decoration: underline }
+    /* div#scrolling { overflow: scroll;  background-color: #cc9; 
       -webkit-overflow-scrolling: touch; } */
-		div#scrolling { background-color: #cc9; }
+    div#scrolling { background-color: #cc9; }
     .inner { height: calc(100% + 1px); }  
-	  html, body { overflow: auto; height: 100% }
+    html, body { overflow: auto; height: 100% }
     body { margin:0; padding:0; background-color: #cc9; }
-		div#top { background-color: #bdd; border-bottom: solid #bdd }
-		.title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
+    div#top { background-color: #bdd; border-bottom: solid #bdd }
+    .title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
     #transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
     #bar { bottom: 0; left: 0; background-color: green; width: 0% }
     #progress { position: absolute; left: 40% }
     .left { left: 0; width: 100%; }
     .right { position: absolute; right: 0 }
    </style>
-	<script>
-	var scrolldiv;
-	var topdiv;
-	var playingId = false;
-	var lastSync = 0;
+  <script>
+  var scrolldiv;
+  var topdiv;
+  var playingId = false;
+  var lastSync = 0;
   var ticker = false;
   var progressSecs = 0;
   var lastTick = 0;
   var msSinceTick = 0;
   var currentDuration = 0;
 
-  var connection = new WebSocket('ws://' + window.location.hostname + ':8080');
+  var connection = new WebSocket('ws://' + window.location.hostname + ':8181');
   
   function incProgress() {
     lastTick = Date.now();
@@ -59,7 +59,6 @@
     currentDuration = 0;
     incProgress();
     ticker = setInterval(incProgress, 1000);
-    // document.getElementById('duration').innerHTML = '...';
   }
   
   function pauseTicker() {
@@ -98,92 +97,75 @@
   };
   
   connection.onmessage = function(msg) {
-    switch (msg.data)
+    var msgObj = JSON.parse(msg.data);
+    switch (msgObj.signal)
     {
     case 'paused':
-    	document.getElementById('pause').innerHTML = 'Play';
+      document.getElementById('pause').innerHTML = 'Play';
       pauseTicker();
-    	break;
+      break;
     case 'unpaused':
-    	document.getElementById('pause').innerHTML = 'Pause';
+      document.getElementById('pause').innerHTML = 'Pause';
       unpauseTicker();
-    	break;
-		case 'stop':
-		case 'end':
-			// If the playing track was highlighted, unhighlight it.
-			elt = document.getElementById(playingId);
-			if (elt)
-			{
-				elt.className = "active";
-			}
-			playingId = false;
+      break;
+    case 'stop':
+    case 'end':
+      // If the playing track was highlighted, unhighlight it.
+      elt = document.getElementById(playingId);
+      if (elt)
+      {
+        elt.className = "active";
+      }
+      playingId = false;
       // Hide transport control bar
       document.getElementById("transport").style.visibility = 'hidden';
       stopTicker();
-			break;
-    default:
-			var splitResponse = msg.data.split(':');
-			if (splitResponse.length == 2 && splitResponse[0] == 'playing')
-			{
-				// Update highlighting of currently playing track.
-        var playId = splitResponse[1];
-				if ((playId != playingId) && playingId)
-				{
-					elt = document.getElementById(playingId);
-					if (elt)
-					{
-						elt.className = "active";
-					}
-				}
-				var elt = document.getElementById(playId);
-				if (elt)
-				{
-					elt.className = "active playing";
-				}
-        // Display track in transport control div..
-        document.getElementById("transport").style.visibility = 'visible';
-        document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
-				playingId = playId;
-        startTicker();
-			}
-      else if (splitResponse.length == 3 && splitResponse[0] == 'played')
+      break;
+    case 'playing':
+      // Update highlighting of currently playing track.
+      var playId = msgObj.filepath;
+      if ((playId != playingId) && playingId)
       {
-        currentDuration = parseInt(splitResponse[2]);
-        //document.getElementById('duration').innerHTML = splitResponse[2];
+        elt = document.getElementById(playingId);
+        if (elt)
+        {
+          elt.className = "active";
+        }
       }
-			else
-			{
-				alert('responseText = ' + resp);
-			}
+      var elt = document.getElementById(playId);
+      if (elt)
+      {
+        elt.className = "active playing";
+      }
+      // Display track in transport control div..
+      document.getElementById("transport").style.visibility = 'visible';
+      document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
+      playingId = playId;
+      startTicker();
+      break;
+    case 'played':
+      currentDuration = msgObj.duration;
+      break;
+    default:
+      alert('msg.data = ' + msg.data);
     }
   };
  
-  function resizeScroller()
-	{
-	   scrolldiv.style.height = window.innerHeight - topdiv.offsetHeight;
-	}
-	function placeScroller()
-	{
-	   topdiv = document.getElementById('top');
-	   scrolldiv = document.getElementById('scrolling');
-	   scrolldiv.style.top = topdiv.offsetHeight + 1;
-	}
-  	
-	function initPlaying()
-	{
-		playingId = document.getElementsByTagName("BODY")[0].getAttribute("playing");
-		var playingTrackRow = document.getElementById(playingId);
-		if (playingTrackRow)
-		{
-			// Display current track plus preceding one.
-			playingTrackRow.className = "active playing";
-		}
+  function initPlaying()
+  {
+    playingId = document.getElementsByTagName("BODY")[0].getAttribute("playing");
+    var playingTrackRow = document.getElementById(playingId);
+    if (playingTrackRow)
+    {
+      // Display current track plus preceding one.
+      playingTrackRow.className = "active playing";
+    }
     document.getElementById("transport").style.visibility = 
       (playingId ? 'visible' : 'hidden');
     document.getElementById('currentTitle').innerHTML = 
       (playingTrackRow ? playingTrackRow.innerHTML : filenameBase(playingId));
-	}
-	</script>
+  }
+  </script>
 <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
 <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
 <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png">

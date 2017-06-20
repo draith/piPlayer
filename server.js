@@ -12,9 +12,10 @@ var invalidUTF8char = String.fromCharCode(0xfffd);
 var musicpath = musicroot;
 var playingfile = false;
 var durationfile = false;
+var durationSecs = 0;
 var dateObj = new Date;
-var startTime = false;
-var pauseTime = false;
+var lastStartTime = false;
+var pausedProgress = false;
 var searchroot;
 var searchstring = '';
 var child_process = require('child_process');
@@ -29,10 +30,17 @@ var urlpath;
 
 const WebSocket = require('ws');
 
-const wss = new WebSocket.Server({ port: 8080 });
+const wss = new WebSocket.Server({ port: 8181 });
 
 wss.on('connection', function connection(ws) {
   console.log('Connection open');
+  //ws.send(JSON.stringify({'signal':'hello!'}));
+  if (playingfile)
+    ws.send({ 'signal'  : (lastStartTime > 0 ? 'playing' : 'paused'),
+              'filepath': playingfile,
+              'progress': progressSecs(),
+              'duration': durationSecs
+                });
 
   // Pass commands from browser through to player
   ws.on('message', function incoming(msg) {
@@ -61,28 +69,41 @@ wss.on('connection', function connection(ws) {
 
 // Broadcast to all.
 wss.broadcast = function broadcast(data) {
-  console.log('broadcast: ' + data);
+  var formatted = JSON.stringify(data);
+  console.log('broadcast: ' + formatted);
   wss.clients.forEach(function each(client) {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(data);
+      client.send(formatted);
     }
   });
 };
 
+function progressSecs()
+{
+  var progress = pausedProgress;
+  if (lastStartTime > 0) {
+    progress += Date.now() - lastStartTime;
+  }
+  return Math.floor(progress / 1000);
+}
+
 function getDuration()
 {
-  startTime = Date.now();
-  console.log('startTime = ' + startTime.toString());
   // Re-entrancy guard.
   if (durationfile) return;
+  durationSecs = 0;
   durationfile = playingfile;
   mp3Duration(playingfile, function(err, duration) {
     if (err) return console.log(err.message);
-    console.log('file ' + playingfile + ' duration is ' + duration);
-    startTime = Math.floor((Date.now() - startTime) / 1000);
-    console.log('played ' + startTime.toString());
+    console.log('file ' + durationfile + ' duration is ' + duration);
     if (durationfile == playingfile) {
-      wss.broadcast('played:' + startTime.toString() + ':' + Math.floor(duration).toString());
+      var progress = progressSecs();
+      durationSecs = Math.floor(duration);
+      console.log('played ' + progress.toString());
+      wss.broadcast({ 'signal'   : 'played',
+                      'progress' : progress,
+                      'duration' : durationSecs
+                    });
       durationfile = false;
     }
     else {
@@ -96,40 +117,52 @@ function getDuration()
 
 // Pass messages from player back to clients
 player.on('message', function(message) {
-	console.log('Received from child: ' + message);
-	// Keep track of currently playing filename.
-	if (message == 'end' || message == 'stop') {
-		playingfile = false;
-	} else {
-		var splitResponse = message.split(':');
-		if (splitResponse.length > 1 && splitResponse[0] == 'playing')
-		{
-			playingfile = message.substr(message.indexOf(':') + 1);
+  console.log('Received from child: ' + message);
+  // Keep track of currently playing filename.
+  if (message == 'end' || message == 'stop') {
+    playingfile = false;
+    wss.broadcast({ 'signal': message });
+  } else {
+    var splitResponse = message.split(':');
+    if (splitResponse.length > 1 && splitResponse[0] == 'playing')
+    {
+      lastStartTime = Date.now();
+      pausedProgress = 0;
+      playingfile = message.substr(message.indexOf(':') + 1);
       getDuration();
-		}
-	}
-  wss.broadcast(message);
+    }
+    else if (message == 'paused') {
+      pausedProgress += Date.now() - lastStartTime;
+      lastStartTime = 0;
+    }
+    else if (message == 'unpaused') {
+      lastStartTime = Date.now();
+    }
+    wss.broadcast({ 'signal'  : splitResponse[0],
+                    'filepath': playingfile
+                  });
+  }
 });
 
 // Populates trackNames as map from filename to track title,
 // from id3v2 output.
 function parseID3(id3Output) 
 {
-	var lines = id3Output.split('\n');
-	var filename = false;
-	var filepath = false;
-	trackNames = [];
+  var lines = id3Output.split('\n');
+  var filename = false;
+  var filepath = false;
+  trackNames = [];
   trackNumbers = [];
   tracksByNumber = [];
   uniqueTrackNumbers = 0;
-	var i;
-	for (i = 0; i < lines.length; i++)
-	{
-		// Get filename from Filename value.
-		if (/^Filename: /.test(lines[i]))
-		{
-			filepath = lines[i].substr(10);
-		}
+  var i;
+  for (i = 0; i < lines.length; i++)
+  {
+    // Get filename from Filename value.
+    if (/^Filename: /.test(lines[i]))
+    {
+      filepath = lines[i].substr(10);
+    }
     // Get track number from TRCK: tag.
     else if (/^TRCK: /.test(lines[i]))
     {
@@ -144,99 +177,96 @@ function parseID3(id3Output)
         }
       }
     }
-		// Get track name from TIT2 value.
-		else if (filepath && /^TIT2: /.test(lines[i]))
-		{
-			var j = 0;
-			var nonAsciiChar = false;
-			var trackName = lines[i].substr(6);
-			// Check trackName for non-ASCII characters..
-			for (j = 0; j < trackName.length; j++)
-			{
-				if (trackName.charCodeAt(j) & 0x80)
-				{
-					nonAsciiChar = trackName.charAt(j);
-					break;
-				}
-			}
-			// id3v2 doesn't always output non-ASCII tracknames as UTF8 - it masks out
-			// bit 8, resulting in ASCII-fied track names, or outputs in Latin-1.
-			// Workaround: If the trackname or filename contains non-ASCII characters, 
-			// then use the corresponding part of the (non-ASCII) filename as
-			// the track name.
-			var trackNameOffset = -1;
-			filename = path.basename(filepath,'.mp3');
-			if (nonAsciiChar == invalidUTF8char)
-			{
-				// Search for match in filename, modulo invalid UTF8 in trackname.
-				for (trackNameOffset = filename.length - trackName.length; 
-					 trackNameOffset >= 0; trackNameOffset--)
-				{
-					for (j = 0; j < trackName.length; j++)
-					{
-						if (trackName.charAt(j) != invalidUTF8char &&
-							trackName.charAt(j) != filename.charAt(trackNameOffset + j)) 
-						{
-							break; // Not a match
-						}
-					}
-					if (j == trackName.length) {
-						break; // Found a match at trackNameOffset.
-					}
-				}
-			}
-			else if (!nonAsciiChar)
-			{
-				// trackname is ASCII - see if it is an ASCII-fied version of part of
-				// a non-ASCII filename...
-				var asciiFilename = '';
-				for (j = 0; j < filename.length; j++)
-				{
-					asciiFilename = asciiFilename + String.fromCharCode(filename.charCodeAt(j) & 0x7f);
-				}
-				if (asciiFilename != filename)
-				{
-					// filename contains non-ASCII characters: look for trackName in asciiFilename
-					trackNameOffset = asciiFilename.indexOf(trackName);
-				}
-			}
-			
-			if (trackNameOffset >= 0)
-			{
-				trackName = filename.substr(trackNameOffset,trackName.length);
-			}
-			trackNames[filepath] = trackName;
-		}
-	}
+    // Get track name from TIT2 value.
+    else if (filepath && /^TIT2: /.test(lines[i]))
+    {
+      var j = 0;
+      var nonAsciiChar = false;
+      var trackName = lines[i].substr(6);
+      // Check trackName for non-ASCII characters..
+      for (j = 0; j < trackName.length; j++)
+      {
+        if (trackName.charCodeAt(j) & 0x80)
+        {
+          nonAsciiChar = trackName.charAt(j);
+          break;
+        }
+      }
+      // id3v2 doesn't always output non-ASCII tracknames as UTF8 - it masks out
+      // bit 8, resulting in ASCII-fied track names, or outputs in Latin-1.
+      // Workaround: If the trackname or filename contains non-ASCII characters, 
+      // then use the corresponding part of the (non-ASCII) filename as
+      // the track name.
+      var trackNameOffset = -1;
+      filename = path.basename(filepath,'.mp3');
+      if (nonAsciiChar == invalidUTF8char)
+      {
+        // Search for match in filename, modulo invalid UTF8 in trackname.
+        for (trackNameOffset = filename.length - trackName.length; 
+           trackNameOffset >= 0; trackNameOffset--)
+        {
+          for (j = 0; j < trackName.length; j++)
+          {
+            if (trackName.charAt(j) != invalidUTF8char &&
+              trackName.charAt(j) != filename.charAt(trackNameOffset + j)) 
+            {
+              break; // Not a match
+            }
+          }
+          if (j == trackName.length) {
+            break; // Found a match at trackNameOffset.
+          }
+        }
+      }
+      else if (!nonAsciiChar)
+      {
+        // trackname is ASCII - see if it is an ASCII-fied version of part of
+        // a non-ASCII filename...
+        var asciiFilename = '';
+        for (j = 0; j < filename.length; j++)
+        {
+          asciiFilename = asciiFilename + String.fromCharCode(filename.charCodeAt(j) & 0x7f);
+        }
+        if (asciiFilename != filename)
+        {
+          // filename contains non-ASCII characters: look for trackName in asciiFilename
+          trackNameOffset = asciiFilename.indexOf(trackName);
+        }
+      }
+      
+      if (trackNameOffset >= 0)
+      {
+        trackName = filename.substr(trackNameOffset,trackName.length);
+      }
+      trackNames[filepath] = trackName;
+    }
+  }
 } // parseID3
 
 function startPage(response, searchResults)
 {
-	response.writeHead(200, {"Content-Type": "text/html"});
-	response.write(pagetop);
-	// Display directory links...
-	if (urlpath == 'cdplaydir') {
-		response.write('<body onload="sendCommand(\'playdir\')">');
-	} else if (playingfile) {
-		response.write('<body playing="' + quotEscaped(playingfile) +
-		'" onload="initPlaying()">');
-	} else {
-		response.write('<body>');
-	}
-	response.write("<div id='top'>");
-	response.write("<p>");
-	var linkPath = musicroot;
-	var diffPath = path.relative(musicroot, musicpath).split('/');
-	while (linkPath != musicpath)
-	{
-		response.write(dirLink(linkPath));
-		linkPath = linkPath + '/' + diffPath.shift();
-		if (linkPath != musicpath)
-		{
-			response.write('>');
-		}
-	}
-	// Write title of current directory
+  response.writeHead(200, {"Content-Type": "text/html"});
+  response.write(pagetop);
+  response.write('<body');
+  if (playingfile) {
+    response.write(' playing="' + quotEscaped(playingfile) +
+    '" onload="initPlaying()"');
+  }
+  response.write("><div id='top'>");
+  // Display directory links...
+  response.write("<p>");
+  var linkPath = musicroot;
+  var diffPath = path.relative(musicroot, musicpath).split('/');
+  while (linkPath != musicpath)
+  {
+    response.write(dirLink(linkPath));
+    linkPath = linkPath + '/' + diffPath.shift();
+    if (linkPath != musicpath)
+    {
+      response.write('>');
+    }
+  }
+  // Write title of current directory
   if (searchResults) {
     response.write('</p>' + dirLink(linkPath));
   }
@@ -244,26 +274,26 @@ function startPage(response, searchResults)
   {
     response.write('</p><p class="title">' + path.basename(musicpath) + '</p>');
   }
-	response.write('</div>\n<div id=scrolling>');
+  response.write('</div>\n<div id=scrolling>');
 }
 
 function endPage(response) 
 {
   // Blank lines to scroll under the track control.
-	response.write('<br/><br/></div>');
-	response.write(pagebot);
-	response.end();
+  response.write('<br/><br/></div>');
+  response.write(pagebot);
+  response.end();
 }
 
 function displayDirPage(response) 
 {
   startPage(response);
-	// Display contents of current directory in scrolling div.
-	var files = fs.readdirSync(musicpath);
+  // Display contents of current directory in scrolling div.
+  var files = fs.readdirSync(musicpath);
   var addedSearch = false;
   var trackCount = 0;
-	for (i = 0; i < files.length; i++)
-	{
+  for (i = 0; i < files.length; i++)
+  {
     var pathname = path.join(musicpath, files[i]);
     var stat = fs.statSync(pathname);
     if (stat.isDirectory())
@@ -278,7 +308,7 @@ function displayDirPage(response)
     {
       trackCount += 1;
     }
-	}
+  }
   
   playList = [];
   
@@ -295,7 +325,7 @@ function displayDirPage(response)
     }
   }
   else for (i = 0; i < files.length; i++)
-	{
+  {
     var pathname = path.join(musicpath, files[i]);
     var stat = fs.statSync(pathname);
     if (!stat.isDirectory())
@@ -303,31 +333,31 @@ function displayDirPage(response)
       response.write(libLink(pathname));
       playList.push(pathname);
     }
-	}
-	endPage(response);
+  }
+  endPage(response);
   
 } // displayDirPage
 
 function getTracksAndDisplayPage(response)
 {
-	// Get id3 tags and refresh page.
-	var cmd = "id3v2 -R " + bashEscaped(musicpath) + "/*.mp3";
-	exec(cmd, { timeout: 10000 },
-		function (error, stdout, stderr) {
-			// Get title tags for display
-			parseID3(stdout);
-			displayDirPage(response);
-		}
-	);
+  // Get id3 tags and refresh page.
+  var cmd = "id3v2 -R " + bashEscaped(musicpath) + "/*.mp3";
+  exec(cmd, { timeout: 10000 },
+    function (error, stdout, stderr) {
+      // Get title tags for display
+      parseID3(stdout);
+      displayDirPage(response);
+    }
+  );
 }
 
 function displaySearchResults(response)
 {
-	// Get search result and refresh page.
-	var cmd = "find " + bashEscaped(searchroot) + ' -iname *' + searchstring.replace(/\s/g, '*') + '*';
+  // Get search result and refresh page.
+  var cmd = "find " + bashEscaped(searchroot) + ' -iname *' + searchstring.replace(/\s/g, '*') + '*';
   console.log('exec command: ' + cmd);
-	exec(cmd, { timeout: 3000 },
-		function (error, stdout, stderr) {
+  exec(cmd, { timeout: 3000 },
+    function (error, stdout, stderr) {
       // Display search results
       startPage(response, true);
       response.write(searchField(musicpath));
@@ -336,7 +366,7 @@ function displaySearchResults(response)
       if (paths.length > 1) { // Ignore empty last entry
         playList = [];
       }
-			for (i = 0; i < paths.length - 1; i++)
+      for (i = 0; i < paths.length - 1; i++)
       {
         console.log('match: ' + paths[i]);
         if (/\.mp3$/.test(paths[i]))
@@ -354,8 +384,8 @@ function displaySearchResults(response)
         }
       }
       endPage(response);
-		}
-	);
+    }
+  );
   
 }
 
@@ -381,13 +411,13 @@ function libLinkDir(pathname)
 {
   // Display directory name in hyperlink to 'cd' to that directory.
   var result = (playingfile && playingfile.indexOf(pathname) == 0 ?
-				'<p class="playing">' : '<p>')
-				+ dirLink(pathname);
+        '<p class="playing">' : '<p>')
+        + dirLink(pathname);
   // Check for any mp3 files in the directory...
   var files = fs.readdirSync(pathname);
   for (j = 0; j < files.length; j++)
   {
-	  // If any, include a 'cdplaydir' link, to play all of them.
+    // If any, include a 'cdplaydir' link, to play all of them.
      if (/\.mp3$/.test(files[j])) {
        result += '<a href="./cdplaydir?path=' + encodeURIComponent(pathname) + '"> (Play)</a>';
        break;
@@ -402,10 +432,10 @@ function libLinkDir(pathname)
 function libLink(pathname) {
   if (/\.mp3$/.test(pathname))
   {
-	  // MP3 file: display track name (or filename if none) in 'play' hyperlink.
-	  var pclass = (pathname == playingfile ? 'active playing' : 'active');
-	  return '<p class="' + pclass + '" id="' + quotEscaped(pathname) + '" onclick="sendCommand(\'play\', this.id)">' + 
-				(trackNumbers[pathname] > 0 ? trackNumbers[pathname] + " : " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
+    // MP3 file: display track name (or filename if none) in 'play' hyperlink.
+    var pclass = (pathname == playingfile ? 'active playing' : 'active');
+    return '<p class="' + pclass + '" id="' + quotEscaped(pathname) + '" onclick="sendCommand(\'play\', this.id)">' + 
+        (trackNumbers[pathname] > 0 ? trackNumbers[pathname] + " : " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
   }
   else return ""; 
 }
@@ -434,66 +464,64 @@ function sendPlist()
 // Request handler callback
 function onRequest(request, response) 
 {
-	var requestURL = url.parse(request.url,true);
-	urlpath = requestURL.pathname.substr(1);
-	console.log('urlpath = ' + urlpath);
-	xmlResponse = false;
-	switch (urlpath)
-	{
-	case 'cd':
-	case 'cdplaydir':
-		musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
-		getTracksAndDisplayPage(response);
-		break;
+  var requestURL = url.parse(request.url,true);
+  urlpath = requestURL.pathname.substr(1);
+  console.log('urlpath = ' + urlpath);
+  xmlResponse = false;
+  switch (urlpath)
+  {
+  case 'cd':
+  case 'cdplaydir':
+    musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
+    getTracksAndDisplayPage(response);
+    break;
   case 'search':
     searchroot = fs.realpathSync(decodeURIComponent(requestURL.query.path));
     searchstring = decodeURIComponent(requestURL.query.searchString);
-    console.log('root = ' + searchroot);
-    console.log('string = ' + searchstring);
     displaySearchResults(response);
     break;
-	case '':
-		// Refresh the page.
-		if (playingfile)
-		{	// Display currently-playing directory, if any..
-			musicpath = path.dirname(playingfile);
-		}
-		getTracksAndDisplayPage(response);
-		break;
-	default:
-		// Handle requests for files (e.g. icons): return them if they exist.
-		var filename = path.join(process.cwd(), unescape(urlpath));
-		var stats;
-		var mimeType;
+  case '':
+    // Refresh the page.
+    if (playingfile)
+    {  // Display currently-playing directory, if any..
+      musicpath = path.dirname(playingfile);
+    }
+    getTracksAndDisplayPage(response);
+    break;
+  default:
+    // Handle requests for files (e.g. icons): return them if they exist.
+    var filename = path.join(process.cwd(), unescape(urlpath));
+    var stats;
+    var mimeType;
 
-		try {
-			stats = fs.lstatSync(filename); // throws if path doesn't exist
-			mimeType = mimetypes.lookup(filename);
-		} catch (e) {
-			console.log('Non-existent file request: ' + filename);
-			response.writeHead(404, {'Content-Type': 'text/plain'});
-			response.write('404 Not Found\n');
-			response.end();
-			return;
-		}
+    try {
+      stats = fs.lstatSync(filename); // throws if path doesn't exist
+      mimeType = mimetypes.lookup(filename);
+    } catch (e) {
+      console.log('Non-existent file request: ' + filename);
+      response.writeHead(404, {'Content-Type': 'text/plain'});
+      response.write('404 Not Found\n');
+      response.end();
+      return;
+    }
 
-		if (stats.isFile() && mimeType) {
-			response.writeHead(200, {"Content-Type": mimeType});
-			var fileStream = fs.createReadStream(filename);
-			fileStream.pipe(response);
-		} else {
-			console.log('Bad file request: ' + filename);
-			response.writeHead(500, {'Content-Type': 'text/plain'});
-			response.write('500 Internal server error\n');
-			response.end();
-		}
-		break;
-	}
+    if (stats.isFile() && mimeType) {
+      response.writeHead(200, {"Content-Type": mimeType});
+      var fileStream = fs.createReadStream(filename);
+      fileStream.pipe(response);
+    } else {
+      console.log('Bad file request: ' + filename);
+      response.writeHead(500, {'Content-Type': 'text/plain'});
+      response.write('500 Internal server error\n');
+      response.end();
+    }
+    break;
+  }
 } // onRequest
 
 process.on('exit', function() {
-	console.log('Shutting down: killing player.');
-	player.kill();
+  console.log('Shutting down: killing player.');
+  player.kill();
 });
 
 http.createServer(onRequest).listen(8889);
