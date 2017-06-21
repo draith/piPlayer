@@ -23,57 +23,55 @@
   var scrolldiv;
   var topdiv;
   var playingId = false;
-  var lastSync = 0;
   var ticker = false;
   var progressSecs = 0;
-  var lastTick = 0;
-  var msSinceTick = 0;
   var currentDuration = 0;
 
   var connection = new WebSocket('ws://' + window.location.hostname + ':8181');
   
-  function incProgress() {
-    lastTick = Date.now();
-    progressSecs += 1;
-    var secs = progressSecs % 60;
+  function displayProgress(progress)
+  {
+    var secs = progress % 60;
     document.getElementById('progress').innerHTML = 
-      Math.floor(progressSecs/60).toString() + 
+      Math.floor(progress/60).toString() + 
       (secs < 10 ? ':0' : ':') + secs.toString();
     if (currentDuration > 0) {
-      document.getElementById('bar').style.width = 
-        (progressSecs * 100 / currentDuration).toString() + '%';
+      if (progress > currentDuration) {
+        stopTicker();
+      }
+      else {
+        document.getElementById('bar').style.width = 
+          (progress * 100 / currentDuration).toString() + '%';
+      }
     }
     else {
       document.getElementById('bar').style.width = "0%";
     }
   }
   
+  function incProgress() {
+    progressSecs += 1;
+    displayProgress(progressSecs);
+  }
+  
   function stopTicker() {
-    clearTimeout(ticker);
-    ticker = false;
+    if (ticker) {
+      clearTimeout(ticker);
+      ticker = false;
+    }
   }  
 
   function startTicker() {
-    if (ticker) stopTicker();
-    progressSecs = -1;  // Will be set to 0 and displayed by incProgress...
-    currentDuration = 0;
-    incProgress();
-    ticker = setInterval(incProgress, 1000);
-  }
-  
-  function pauseTicker() {
-    msSinceTick = Date.now() - lastTick;
     stopTicker();
-  }
-  
-  function unpauseTicker() {
-    // Increment progressSecs after 1000-msSinceTick
-    // and then every second.
-    setTimeout(function() {
-      incProgress();
-      ticker = setInterval(incProgress, 1000);
-    },
-    1000 - msSinceTick);
+    displayProgress(Math.floor(progressSecs));
+    setTimeout(
+      function() {
+        progressSecs = Math.floor(progressSecs) + 1;
+        displayProgress(progressSecs);
+        ticker = setInterval(incProgress, 1000);
+      },
+      1000 * (Math.ceil(progressSecs) - progressSecs)
+    );
   }
 
   function sendCommand(cmd,arg) {
@@ -100,13 +98,10 @@
     var msgObj = JSON.parse(msg.data);
     switch (msgObj.signal)
     {
-    case 'paused':
-      document.getElementById('pause').innerHTML = 'Play';
-      pauseTicker();
-      break;
     case 'unpaused':
       document.getElementById('pause').innerHTML = 'Pause';
-      unpauseTicker();
+      progressSecs = msgObj.progress;
+      startTicker();
       break;
     case 'stop':
     case 'end':
@@ -121,6 +116,7 @@
       document.getElementById("transport").style.visibility = 'hidden';
       stopTicker();
       break;
+    case 'paused':
     case 'playing':
       // Update highlighting of currently playing track.
       var playId = msgObj.filepath;
@@ -141,30 +137,23 @@
       document.getElementById("transport").style.visibility = 'visible';
       document.getElementById('currentTitle').innerHTML = (elt ? elt.innerHTML : filenameBase(playId));
       playingId = playId;
-      startTicker();
-      break;
-    case 'played':
+      stopTicker();
+      progressSecs = msgObj.progress;
       currentDuration = msgObj.duration;
+      displayProgress(Math.floor(progressSecs));
+      if (msgObj.signal == 'paused') {
+        document.getElementById('pause').innerHTML = 'Play';
+      } else {
+        startTicker();
+      }
+      break;
+    case 'duration':
+      currentDuration = msgObj.value;
       break;
     default:
       alert('msg.data = ' + msg.data);
     }
   };
- 
-  function initPlaying()
-  {
-    playingId = document.getElementsByTagName("BODY")[0].getAttribute("playing");
-    var playingTrackRow = document.getElementById(playingId);
-    if (playingTrackRow)
-    {
-      // Display current track plus preceding one.
-      playingTrackRow.className = "active playing";
-    }
-    document.getElementById("transport").style.visibility = 
-      (playingId ? 'visible' : 'hidden');
-    document.getElementById('currentTitle').innerHTML = 
-      (playingTrackRow ? playingTrackRow.innerHTML : filenameBase(playingId));
-  }
   </script>
 <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
 <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">

@@ -36,11 +36,14 @@ wss.on('connection', function connection(ws) {
   console.log('Connection open');
   //ws.send(JSON.stringify({'signal':'hello!'}));
   if (playingfile)
-    ws.send({ 'signal'  : (lastStartTime > 0 ? 'playing' : 'paused'),
-              'filepath': playingfile,
-              'progress': progressSecs(),
-              'duration': durationSecs
-                });
+    ws.send(
+      JSON.stringify(
+      { 'signal'  : (lastStartTime > 0 ? 'playing' : 'paused'),
+        'filepath': playingfile,
+        'progress': progressSecs(),
+        'duration': durationSecs
+      })
+    );
 
   // Pass commands from browser through to player
   ws.on('message', function incoming(msg) {
@@ -84,7 +87,7 @@ function progressSecs()
   if (lastStartTime > 0) {
     progress += Date.now() - lastStartTime;
   }
-  return Math.floor(progress / 1000);
+  return progress / 1000;
 }
 
 function getDuration()
@@ -98,11 +101,10 @@ function getDuration()
     console.log('file ' + durationfile + ' duration is ' + duration);
     if (durationfile == playingfile) {
       var progress = progressSecs();
-      durationSecs = Math.floor(duration);
-      console.log('played ' + progress.toString());
-      wss.broadcast({ 'signal'   : 'played',
-                      'progress' : progress,
-                      'duration' : durationSecs
+      durationSecs = duration;
+      console.log('duration ' + duration.toString());
+      wss.broadcast({ 'signal': 'duration',
+                      'value' : durationSecs
                     });
       durationfile = false;
     }
@@ -139,7 +141,9 @@ player.on('message', function(message) {
       lastStartTime = Date.now();
     }
     wss.broadcast({ 'signal'  : splitResponse[0],
-                    'filepath': playingfile
+                    'filepath': playingfile,
+                    'progress': progressSecs(),
+                    'duration': 0
                   });
   }
 });
@@ -247,12 +251,7 @@ function startPage(response, searchResults)
 {
   response.writeHead(200, {"Content-Type": "text/html"});
   response.write(pagetop);
-  response.write('<body');
-  if (playingfile) {
-    response.write(' playing="' + quotEscaped(playingfile) +
-    '" onload="initPlaying()"');
-  }
-  response.write("><div id='top'>");
+  response.write("<body><div id='top'>");
   // Display directory links...
   response.write("<p>");
   var linkPath = musicroot;
@@ -474,6 +473,10 @@ function onRequest(request, response)
   case 'cdplaydir':
     musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
     getTracksAndDisplayPage(response);
+    if (urlpath == 'cdplaydir') {
+      console.log('sending playdir:' + musicpath + ' to player');
+      player.send({'command':'playdir', 'arg': musicpath });
+    }
     break;
   case 'search':
     searchroot = fs.realpathSync(decodeURIComponent(requestURL.query.path));
