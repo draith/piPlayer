@@ -15,7 +15,7 @@
     .title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
     #transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
     #bar { bottom: 0; left: 0; background-color: green; width: 0% }
-    #progress { position: absolute; left: 40% }
+    #progress { position: absolute; left: 25% }
     .left { left: 0; width: 100%; }
     .right { position: absolute; right: 0 }
    </style>
@@ -144,11 +144,13 @@
       if (msgObj.signal == 'paused') {
         document.getElementById('pause').innerHTML = 'Play';
       } else {
+        document.getElementById('pause').innerHTML = 'Pause';
         startTicker();
       }
       break;
     case 'duration':
       currentDuration = msgObj.value;
+      displayProgress(Math.floor(progressSecs));
       break;
     default:
       alert('msg.data = ' + msg.data);
