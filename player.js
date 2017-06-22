@@ -105,11 +105,7 @@ var commandFunctions =
 	,
 	next: function() 
 	{
-		if (!omx.isPlaying())
-		{
-			process.send('end');
-		}
-		else if (nextIndex < plist.length)
+		if (nextIndex < plist.length)
 		{
 			stopAndPlayNext();
 		}
@@ -121,24 +117,14 @@ var commandFunctions =
 	,
 	start: function() 
 	{
-		if (!omx.isPlaying())
-		{
-			process.send('end');
-		}
-		else 
-		{	// Move nextIndex back one to start current track again.
-			nextIndex -= 1;
-			stopAndPlayNext();
-		}
+		// Move nextIndex back one to start current track again.
+		nextIndex -= 1;
+		stopAndPlayNext();
 	}
 	,
 	prev: function() 
 	{
-		if (!omx.isPlaying())
-		{
-			process.send('end');
-		}
-		else if (nextIndex > 1)
+		if (nextIndex > 1)
 		{	// Move nextIndex back 2 to start previous track.
 			nextIndex -= 2;
 			stopAndPlayNext();
