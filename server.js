@@ -473,10 +473,6 @@ function onRequest(request, response)
   case 'cdplaydir':
     musicpath = fs.realpathSync(decodeURIComponent(requestURL.query.path));
     getTracksAndDisplayPage(response);
-    if (urlpath == 'cdplaydir') {
-      console.log('sending playdir:' + musicpath + ' to player');
-      player.send({'command':'playdir', 'arg': musicpath });
-    }
     break;
   case 'search':
     searchroot = fs.realpathSync(decodeURIComponent(requestURL.query.path));

@@ -26,6 +26,7 @@
   var ticker = false;
   var progressSecs = 0;
   var currentDuration = 0;
+  //var lastTick = false;
 
   var connection = new WebSocket('ws://' + window.location.hostname + ':8181');
   
@@ -49,18 +50,21 @@
     }
   }
   
-  function incProgress() {
-    progressSecs += 1;
-    displayProgress(progressSecs);
-  }
-  
   function stopTicker() {
     if (ticker) {
       clearTimeout(ticker);
       ticker = false;
+      lastTick = false;
     }
   }  
 
+  function incProgress() {
+    //var now = Date.now();
+    progressSecs += 1; //(lastTick ? Math.round((now - lastTick)/1000) : 1);
+    //lastTick = now;
+    displayProgress(progressSecs);
+  }
+  
   function startTicker() {
     stopTicker();
     displayProgress(Math.floor(progressSecs));
@@ -89,7 +93,7 @@
       sendCommand('playdir');
     }
   };
-  
+    
   connection.onerror = function(error) {
     alert('WebSocket error: ' + error);
   };
