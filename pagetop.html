@@ -2,23 +2,7 @@
 <head>
   <title>piPlayer</title>
   <meta charset="UTF-8">
-  <style>
-    a,p,span,div,form,input { font-size: 60px; font-family: sans-serif; margin: 0px; padding: 10px; }
-    .active { cursor: pointer; color: rgb(85,26,139); text-decoration: underline }
-    /* div#scrolling { overflow: scroll;  background-color: #cc9; 
-      -webkit-overflow-scrolling: touch; } */
-    div#scrolling { background-color: #cc9; }
-    .inner { height: calc(100% + 1px); }  
-    html, body { overflow: auto; height: 100% }
-    body { margin:0; padding:0; background-color: #cc9; }
-    div#top { background-color: #bdd; border-bottom: solid #bdd }
-    .title,.playing { color: green; font-style: italic; text-shadow: 2px 2px #333 }
-    #transport { position: fixed; bottom: 0; background-color: #bdd; visibility: hidden }
-    #bar { bottom: 0; left: 0; background-color: green; width: 0% }
-    #progress { position: absolute; left: 25% }
-    .left { left: 0; width: 100%; }
-    .right { position: absolute; right: 0 }
-   </style>
+  <link rel="stylesheet" type="text/css" href="./player.css"/>
   <script>
   var scrolldiv;
   var topdiv;
