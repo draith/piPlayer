@@ -16,6 +16,16 @@ function playFile(filepath) {
 	omx.play(filepath,{'-o': 'local', '--vol': '-300', '--no_keys': ''});
 }
 
+function playStream(url) {
+	if (!started)
+	{
+		omx.enableHangingHandler();
+		started = true;
+	}
+	console.log('Calling playStream(' + url + ')');
+	omx.play(url,{'-o': 'local', '--vol': '-300', '--no_keys': ''});
+}
+
 function playnext() {
 	console.log('playnext called, plist.length = ' + plist.length + ', nextIndex = ' + nextIndex);
 	if (nextIndex < plist.length)
@@ -181,6 +191,16 @@ var commandFunctions =
   {
     plist.push(filepath);
   }
+  ,
+  playStation: function(url)
+  {
+    plist = [ url ];
+    nextIndex = 0;
+    stopAndPlayNext();
+    // commandFunctions.stop();
+    // playStream(url);
+  }
+    
 }; // commandFunctions
 
 // At the end of each track, play the next track in the playlist, if there is one.
