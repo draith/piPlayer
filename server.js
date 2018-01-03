@@ -6,8 +6,6 @@ var mimetypes = require("mime-types");
 var mp3Duration = require("mp3-duration");
 var pagetop = fs.readFileSync('pagetop.html');
 var pagebot = fs.readFileSync('pagebot.html');
-var radiopagetop = fs.readFileSync('radiopagetop.html');
-var radiopagebot = fs.readFileSync('radiopagebot.html');
 var index;
 var musicroot = "/home/pi/usbdrv/Music";
 var invalidUTF8char = String.fromCharCode(0xfffd);
@@ -27,7 +25,6 @@ var trackNumbers = [];
 var tracksByNumber = [];
 var playList = [];
 var uniqueTrackNumbers = 0;
-var stations = require("./radiostations");
 var player = child_process.fork('./player');
 var urlpath;
 
@@ -492,18 +489,6 @@ function onRequest(request, response)
       musicpath = path.dirname(playingfile);
     }
     getTracksAndDisplayPage(response);
-    break;
-  case 'radio':
-    response.writeHead(200, {"Content-Type": "text/html"});
-    response.write(radiopagetop);
-    for (index = 0; index < stations.list.length; index++) {
-      // link for each radio station
-      response.write('<p class="active" id="' + stations.list[index].url + 
-      '" onclick="sendCommand(\'playStation\', this.id)">' + 
-        stations.list[index].name + "</p>");
-    }
-    response.write(radiopagebot);
-    response.end();
     break;
   default:
     // Handle requests for files (e.g. icons): return them if they exist.
