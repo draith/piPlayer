@@ -155,9 +155,9 @@ function parseID3(id3Output)
   var lines = id3Output.split('\n');
   var filename = false;
   var filepath = false;
-  trackNames = [];
-  trackNumbers = [];
-  tracksByNumber = [];
+  // trackNames = [];
+  // trackNumbers = [];
+  // tracksByNumber = [];
   uniqueTrackNumbers = 0;
   var i;
   for (i = 0; i < lines.length; i++)
@@ -370,10 +370,10 @@ function displaySearchResults(response)
         console.log('match: ' + paths[i]);
         if (/\.mp3$/.test(paths[i]))
         {
-          // MP3 file: display filename in 'play' hyperlink.
+          // MP3 file: display id3 info or filename in 'play' hyperlink.
           response.write('<p class="active" id="' + quotEscaped(paths[i]) + 
                          '" onclick="sendCommand(\'play\', this.id)">' + 
-                         path.basename(paths[i],'.mp3') + '</p>');
+                         id3infoOrBasename(paths[i]) + '</p>');
           // Add to playlist
           playList.push(paths[i]);
         }
@@ -427,6 +427,11 @@ function libLinkDir(pathname)
   return result;
 }
 
+function id3infoOrBasename(pathname) {
+  return (trackNumbers[pathname] > 0 ? trackNumbers[pathname] + " : " : '') + 
+  (trackNames[pathname] || path.basename(pathname,'.mp3'));
+}
+
 // Display title and hyperlink(s) for one mp3 file in current directory.
 function libLink(pathname) {
   if (/\.mp3$/.test(pathname))
@@ -434,7 +439,7 @@ function libLink(pathname) {
     // MP3 file: display track name (or filename if none) in 'play' hyperlink.
     var pclass = (pathname == playingfile ? 'active playing' : 'active');
     return '<p class="' + pclass + '" id="' + quotEscaped(pathname) + '" onclick="sendCommand(\'play\', this.id)">' + 
-        (trackNumbers[pathname] > 0 ? trackNumbers[pathname] + " : " : '') + (trackNames[pathname] || path.basename(pathname,'.mp3')) + '</p>';
+    id3infoOrBasename(pathname) + '</p>';
   }
   else return ""; 
 }
